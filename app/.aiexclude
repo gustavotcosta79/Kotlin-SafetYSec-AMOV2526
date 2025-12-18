@@ -1,0 +1,217 @@
+# .aiexclude
+# Regras para excluir ficheiros da análise do Gemini AI no Android Studio
+
+# ============================================================================
+# BUILD & GRADLE
+# ============================================================================
+# Ficheiros de build gerados automaticamente
+.gradle/
+build/
+*/build/
+**/build/
+.gradletasknamecache
+
+# Gradle Wrapper (binários)
+gradle/wrapper/gradle-wrapper.jar
+
+# Caches locais do Gradle
+.gradle/
+local.properties
+
+# ============================================================================
+# IDE (Android Studio / IntelliJ)
+# ============================================================================
+.idea/
+*.iml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/.name
+.idea/compiler.xml
+.idea/misc.xml
+.idea/deploymentTargetDropDown.xml
+
+# Captures de ecrã e profiling
+captures/
+*.hprof
+
+# ============================================================================
+# KOTLIN & JAVA
+# ============================================================================
+# Ficheiros compilados
+*.class
+*.jar
+*.war
+*.ear
+
+# Ficheiros de log
+*.log
+
+# ============================================================================
+# ANDROID
+# ============================================================================
+# Ficheiros de build do Android
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Ficheiros gerados
+gen/
+out/
+release/
+
+# Local configuration (SDK path, etc)
+local.properties
+
+# Proguard
+proguard/
+
+# Lint
+lint/
+
+
+
+# ============================================================================
+# RECURSOS GRANDES & MEDIA
+# ============================================================================
+# Excluir ficheiros de media grandes
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.mp3
+*.wav
+*.flac
+
+# Imagens de alta resolução
+**/drawable-xxxhdpi/
+**/mipmap-xxxhdpi/
+
+# Assets grandes
+app/src/main/assets/*.db
+app/src/main/assets/*.zip
+
+# ============================================================================
+# DEPENDÊNCIAS & LIBRARIES
+# ============================================================================
+# Node modules (se usar React Native ou ferramentas web)
+node_modules/
+
+# Bibliotecas externas
+libs/*.jar
+libs/*.aar
+
+# ============================================================================
+# FICHEIROS TEMPORÁRIOS & CACHE
+# ============================================================================
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Cache do Kotlin
+.kotlin/
+
+# ============================================================================
+# TESTES & COBERTURA
+# ============================================================================
+# Relatórios de testes
+test-results/
+androidTest-results/
+
+# Cobertura de código
+coverage/
+*.exec
+
+# ============================================================================
+# VERSIONAMENTO & BACKUP
+# ============================================================================
+# Backups
+*.bak
+*.backup
+*_backup/
+
+# Patches
+*.patch
+*.diff
+
+# ============================================================================
+# DADOS SENSÍVEIS - SEGURANÇA
+# ============================================================================
+# Chaves e secrets
+secrets.properties
+keystore.properties
+*.keystore
+*.jks
+
+# Ficheiros de configuração com credenciais
+**/config/secrets/
+**/config/keys/
+
+# Variáveis de ambiente locais
+.env
+.env.local
+.env.*.local
+
+# ============================================================================
+# DOCUMENTAÇÃO GERADA
+# ============================================================================
+# Javadoc / KDoc
+docs/
+documentation/
+kdoc/
+javadoc/
+
+# ============================================================================
+# FICHEIROS ESPECÍFICOS DO PROJETO SafetYSec
+# ============================================================================
+# Dados de teste sensíveis
+**/test-data/users/
+**/mock-data/credentials/
+
+# Vídeos de teste (podem ser grandes)
+**/test-videos/
+app/src/debug/assets/videos/
+
+# Logs de monitorização
+monitoring-logs/
+alert-logs/
+
+# Base de dados local de desenvolvimento
+*.db
+*.db-shm
+*.db-wal
+
+# ============================================================================
+# EXCLUIR POR TIPO DE ANÁLISE
+# ============================================================================
+# Excluir de code review, mas incluir em debug
+# (comentar se quiser incluir)
+# **/debug/
+
+# Ficheiros gerados por ferramentas
+**/generated/
+
+# ============================================================================
+# REGRAS ADICIONAIS RECOMENDADAS
+# ============================================================================
+# Excluir ficheiros muito grandes (> 1MB)
+# A IA pode ter dificuldade em processar ficheiros grandes
+
+# Excluir código de terceiros
+**/vendor/
+**/third-party/
+
+# Excluir ficheiros binários
+*.so
+*.a
+*.o

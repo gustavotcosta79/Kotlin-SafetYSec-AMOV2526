@@ -1,12 +1,19 @@
 package pt.isec.amov.safetysec.data.model
 
+import com.google.firebase.firestore.PropertyName
+
 class User (
      val id: String = "",
      val email: String = "",
      val name: String = "",
 
-     val isMonitor: Boolean = false,
-     val isProtected: Boolean = false,
+     @get:PropertyName("isMonitor")
+     @set:PropertyName("isMonitor")
+     var isMonitor: Boolean = false,
+
+     @get:PropertyName("isProtected")
+     @set:PropertyName("isProtected")
+     var isProtected: Boolean = false,
 
     val cancellationCode: String = "1234",
     val associatedMonitorIds: List <String> = emptyList(),
