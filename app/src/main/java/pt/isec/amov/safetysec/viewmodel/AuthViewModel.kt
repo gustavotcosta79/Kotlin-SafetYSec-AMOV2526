@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.data.repository.AuthRepository
 
 class AuthViewModel : ViewModel() {
@@ -22,7 +23,10 @@ class AuthViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
 
+    var currentUser by mutableStateOf<User?>(null)
     private val repository = AuthRepository()
+
+    var cancellationCode by mutableStateOf("")
 
     // --- Lógica de Login ---
     fun onLoginClick(onSuccess: () -> Unit) {
@@ -38,6 +42,7 @@ class AuthViewModel : ViewModel() {
             val result = repository.login(email, password)
             isLoading = false
             if (result.isSuccess) {
+                currentUser = result.getOrNull()
                 onSuccess()
             } else {
                 errorMessage = result.exceptionOrNull()?.message ?: "Erro ao iniciar sessão."
@@ -58,12 +63,18 @@ class AuthViewModel : ViewModel() {
             return
         }
 
+        if (isProtected && cancellationCode.length < 4) {
+            errorMessage = "O código de cancelamento deve ter pelo menos 4 dígitos."
+            return
+        }
+
         isLoading = true
         errorMessage = null
 
         viewModelScope.launch {
             // Chama o repositório passando os dois booleanos dos perfis
-            val result = repository.register(name, email, password, isMonitor, isProtected)
+            val codeToSend = if (isProtected) cancellationCode else ""
+            val result = repository.register(name, email, password, isMonitor, isProtected,codeToSend)
 
             isLoading = false
             if (result.isSuccess) {

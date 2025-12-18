@@ -1,10 +1,12 @@
 package pt.isec.amov.safetysec.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import pt.isec.amov.safetysec.ui.screens.MainContainerScreen
 import pt.isec.amov.safetysec.ui.screens.auth.LoginScreen
 import pt.isec.amov.safetysec.ui.screens.auth.RegisterScreen
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
@@ -24,9 +26,9 @@ fun AppNavigation() {
             LoginScreen(
                 viewModel = authViewModel,
                 onLoginSuccess = {
-                    // TODO: Aqui vamos decidir para onde ir (Monitor ou Protegido)
-                    // Por enquanto, vamos assumir que vai para um ecrã temporário ou imprime no Log
-                    println("Navegar para Dashboard!")
+                    navController.navigate(Screen.MainApp.route) {
+                    popUpTo(Screen.Login.route) { inclusive = true }
+                }
                 },
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
@@ -48,6 +50,33 @@ fun AppNavigation() {
             )
         }
 
-        //FALTA IMPLEMENTAR OS RESTANTES ECRÃS SEGUINDO A MESMA LÓGICA
+        // --- 3. APLICAÇÃO PRINCIPAL (Monitor e/ou Protegido) ---
+        composable(Screen.MainApp.route) {
+            // Obtemos o utilizador atual guardado no ViewModel
+            val user = authViewModel.currentUser
+
+            // Verificação de segurança: Só mostramos o ecrã se houver user logado
+            if (user != null) {
+                MainContainerScreen(
+                    user = user,
+                    onLogout = {
+                        authViewModel.onLogoutClick {
+                            // Ao fazer logout, volta ao ecrã de Login e limpa tudo
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(Screen.MainApp.route) { inclusive = true }
+                            }
+                        }
+                    }
+                )
+            } else {
+                // Se por acaso o user for null (erro raro ou refresh do processo),
+                // manda o utilizador de volta para o login.
+                LaunchedEffect(Unit) {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.MainApp.route) { inclusive = true }
+                    }
+                }
+            }
+        }
     }
 }

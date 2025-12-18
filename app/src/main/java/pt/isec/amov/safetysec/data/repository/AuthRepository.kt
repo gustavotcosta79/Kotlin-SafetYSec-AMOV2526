@@ -9,7 +9,7 @@ class AuthRepository {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
 
-    suspend fun register(name: String, email: String, pass: String, isMonitor: Boolean, isProtected: Boolean): Result<Unit> {
+    suspend fun register(name: String, email: String, pass: String, isMonitor: Boolean, isProtected: Boolean,cancellationCode: String): Result<Unit> {
         return try {
             val result = auth.createUserWithEmailAndPassword(email, pass).await()
             val uid = result.user?.uid ?: throw Exception("Erro no UID")
@@ -20,7 +20,7 @@ class AuthRepository {
                 email = email,
                 isMonitor = isMonitor,
                 isProtected = isProtected,
-                cancellationCode = "1234" // Requisito: código de cancelamento [cite: 32, 33]
+                cancellationCode = cancellationCode
             )
 
             db.collection("users").document(uid).set(newUser).await()
@@ -30,10 +30,21 @@ class AuthRepository {
         }
     }
 
-    suspend fun login(email: String, pass: String): Result<Unit> {
+
+    suspend fun login(email: String, pass: String): Result<User?> {
         return try {
             auth.signInWithEmailAndPassword(email, pass).await()
-            Result.success(Unit)
+            val uid = auth.currentUser?.uid ?: return Result.failure(Exception("User not found"))
+            getUserData(uid)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    suspend fun getUserData(uid: String): Result<User?> {
+        return try {
+            val snapshot = db.collection("users").document(uid).get().await()
+            val user = snapshot.toObject(User::class.java)
+            Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
         }

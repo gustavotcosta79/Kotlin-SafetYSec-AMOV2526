@@ -97,6 +97,37 @@ fun RegisterScreen(
             Text(text = "Protegido (Utilizador)")
         }
 
+        //parte do codigo para cancelar avisos
+        if (viewModel.isProtected) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = viewModel.cancellationCode,
+                onValueChange = {
+                    // Impedir que escreva mais de 4-6 números
+                    if (it.length <= 6 && it.all { char -> char.isDigit() }) {
+                        viewModel.cancellationCode = it
+                    }
+                },
+                label = { Text("Código Cancelamento (PIN)") },
+                placeholder = { Text("Ex: 1234") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.NumberPassword, //meter p aparecer o numpad
+                    imeAction = ImeAction.Done
+                ),
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Text(
+                text = "* Necessário para cancelar alertas falsos",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         // Mensagem de Erro
         if (viewModel.errorMessage != null) {
             Text(
