@@ -47,4 +47,13 @@ class AuthRepository {
             null
         }
     }
+
+
+    fun logout() {
+        try {
+            auth.signOut()
+        } catch (e: Exception) {
+            // Em logout, erros são raros, mas convém logar se necessário
+        }
+    }
 }

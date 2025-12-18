@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
 import pt.isec.amov.safetysec.ui.theme.SafetYSecTheme
-import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,18 +28,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                val viewModel: AuthViewModel = viewModel()
 
-                LaunchedEffect(Unit) {
-                    // Isto vai tentar criar um utilizador de teste mal abras a app
-                    viewModel.registerUser(
-                        name = "Utilizador Teste2",
-                        email = "teste2@isec.pt",
-                        pass = "password123",
-                        isMonitor = true,
-                        isProtected = true // Testando perfil duplo conforme requisito
-                    )
-                }
 
             }
         }

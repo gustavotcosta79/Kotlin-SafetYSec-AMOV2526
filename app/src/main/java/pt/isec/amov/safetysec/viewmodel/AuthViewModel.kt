@@ -77,6 +77,12 @@ class AuthViewModel : ViewModel() {
     // --- Lógica de Logout ---
     fun onLogoutClick(onSuccess: () -> Unit) {
         repository.logout()
-        onSuccess()
+
+        // Limpar dados do formulário para segurança (opcional)
+        email = ""
+        password = ""
+        name = ""
+
+        onSuccess() // Geralmente navega para a LoginScreen
     }
 }
