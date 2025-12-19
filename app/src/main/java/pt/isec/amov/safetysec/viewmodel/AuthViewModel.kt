@@ -38,6 +38,9 @@ class AuthViewModel : ViewModel() {
     var connectionCode by mutableStateOf<String?>(null) // Código que o Protegido gera
         private set
 
+    var monitoredUsers by mutableStateOf<List<User>>(emptyList())
+        private set
+
     var codeInput by mutableStateOf("") // Código que o Monitor escreve
 
     init {
@@ -52,6 +55,22 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             val user = authRepository.getUserProfile(uid)
             currentUser = user
+        }
+    }
+
+    fun fetchMonitoredUsers() {
+        val user = currentUser ?: return
+        // Usando o nome correto da tua classe User
+        if (!user.isMonitor || user.associatedProtegidoIds.isEmpty()) {
+            monitoredUsers = emptyList()
+            return
+        }
+
+        viewModelScope.launch {
+            val result = firestoreRepository.getAssociatedUsers(user.associatedProtegidoIds)
+            if (result.isSuccess) {
+                monitoredUsers = result.getOrNull() ?: emptyList()
+            }
         }
     }
 

@@ -30,7 +30,6 @@ class FirestoreRepository {
     // Ponto 3 e 4: O Monitor usa o código, a ligação é feita e o código APAGADO
     suspend fun linkMonitorToProtected(monitorId: String, codeInput: String): Result<Unit> {
         return try {
-            // 1. Procurar quem tem este código
             val query = db.collection("users")
                 .whereEqualTo("connectionCode", codeInput)
                 .get()
@@ -41,46 +40,19 @@ class FirestoreRepository {
             val protectedDoc = query.documents.first()
             val protectedId = protectedDoc.id
 
-            // VERIFICAR SE É ELE PROPRIO
             if (protectedId == monitorId) {
                 throw Exception("Não pode associar-se a si próprio!")
             }
 
-
-            // 2. Operação Atómica para ligar e apagar o código
             val batch = db.batch()
             val monitorRef = db.collection("users").document(monitorId)
             val protectedRef = db.collection("users").document(protectedId)
 
-            // Adiciona IDs às listas de associação (Requisito de monitorização)
-            batch.update(monitorRef, "myProtectedUsers", FieldValue.arrayUnion(protectedId))
-            batch.update(protectedRef, "myMonitors", FieldValue.arrayUnion(monitorId))
-
-            // PONTO 4: Apagar o código para que expire após este uso único
-            batch.update(protectedRef, "connectionCode", null)
-
-            batch.commit().await()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Cria a ligação bi-direcional entre Monitor e Protegido
-     */
-    suspend fun linkUsers(monitorId: String, protectedId: String): Result<Unit> {
-        return try {
-            val batch = db.batch()
-
-            val monitorRef = db.collection("users").document(monitorId)
-            val protectedRef = db.collection("users").document(protectedId)
-
-            // Adiciona à lista de cada um usando FieldValue.arrayUnion para evitar duplicados
+            // Corrigido para os nomes do teu modelo:
             batch.update(monitorRef, "associatedProtegidoIds", FieldValue.arrayUnion(protectedId))
             batch.update(protectedRef, "associatedMonitorIds", FieldValue.arrayUnion(monitorId))
 
-            // Remove o código de associação usado [cite: 18]
+            // Apaga o código após o uso (OTP)
             batch.update(protectedRef, "connectionCode", null)
 
             batch.commit().await()
@@ -90,42 +62,18 @@ class FirestoreRepository {
         }
     }
 
-    // --- REGRAS DE MONITORIZAÇÃO ---
-
-    /**
-     * O Monitor cria ou altera uma regra [cite: 22]
-     */
-    suspend fun upsertRule(rule: Rule): Result<Unit> {
+    // Nova função para listar os protegidos com os nomes correctos
+    suspend fun getAssociatedUsers(uids: List<String>): Result<List<User>> {
         return try {
-            db.collection("rules").document(rule.id).set(rule).await()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+            if (uids.isEmpty()) return Result.success(emptyList())
 
-    /**
-     * O Protegido autoriza ou revoga uma regra individualmente [cite: 23, 47]
-     */
-    suspend fun setRuleStatus(ruleId: String, isEnabled: Boolean): Result<Unit> {
-        return try {
-            db.collection("rules").document(ruleId)
-                .update("ativa", isEnabled).await()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
+            val snapshot = db.collection("users")
+                .whereIn("id", uids)
+                .get()
+                .await()
 
-    // --- GESTÃO DE ALERTAS ---
-
-    /**
-     * Regista um novo alerta com localização e dados do evento [cite: 34, 35]
-     */
-    suspend fun createAlert(alert: Alert): Result<Unit> {
-        return try {
-            db.collection("alerts").document(alert.id).set(alert).await()
-            Result.success(Unit)
+            val users = snapshot.toObjects(User::class.java)
+            Result.success(users)
         } catch (e: Exception) {
             Result.failure(e)
         }

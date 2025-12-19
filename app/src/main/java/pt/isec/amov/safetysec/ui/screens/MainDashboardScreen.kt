@@ -18,6 +18,7 @@ fun MainDashboardScreen(authViewModel: AuthViewModel) {
 
     // 1. Lógica de Carregamento (tua abordagem)
     if (user == null) {
+
         LaunchedEffect(Unit) {
             authViewModel.fetchCurrentUser()
         }
@@ -30,6 +31,12 @@ fun MainDashboardScreen(authViewModel: AuthViewModel) {
     // 2. Inicialização da Tab como o teu colega fez:
     // Se for Monitor, começa no Monitor. Se não, vai para o outro.
     var isMonitorTabSelected by remember { mutableStateOf(user.isMonitor) }
+
+    LaunchedEffect(isMonitorTabSelected) {
+        if (isMonitorTabSelected && user.isMonitor) {
+            authViewModel.fetchMonitoredUsers()
+        }
+    }
 
     val showBottomBar = user.isMonitor && user.isProtected
 
