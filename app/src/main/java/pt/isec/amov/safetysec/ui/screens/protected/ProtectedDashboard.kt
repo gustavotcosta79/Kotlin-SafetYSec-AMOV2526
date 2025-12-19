@@ -1,32 +1,80 @@
 package pt.isec.amov.safetysec.ui.screens.protected
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import pt.isec.amov.safetysec.data.repository.FirestoreRepository
+import pt.isec.amov.safetysec.managers.LocationManager
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
+import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModel
+import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModelFactory
 
 @Composable
-fun ProtectedDashboard(viewModel: AuthViewModel) {
+fun ProtectedDashboard(
+    authViewModel: AuthViewModel // Usado para saber QUEM é o user e gerir o OTP
+) {
+    val context = LocalContext.current
+    val user = authViewModel.currentUser
+
+    // 1. Instanciar o ViewModel do Protegido usando a Factory (Slide 80)
+    // Isto permite injetar o LocationManager e o Repository
+    val protegidoViewModel: ProtegidoViewModel = viewModel(
+        factory = ProtegidoViewModelFactory(
+            LocationManager(context),
+            FirestoreRepository()
+        )
+    )
+
+    // --- LÓGICA DE PERMISSÕES
+    // 1. Criamos o "lançador" que vai receber a resposta do utilizador (Sim/Não)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        // Aqui vemos se o user aceitou
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+        if (!granted) {
+            // Opcional: Mostrar aviso que a app precisa disto para funcionar
+        }
+    }
+
+    // 2. Quando o ecrã abre (LaunchedEffect), verificamos se já temos permissão
+    LaunchedEffect(Unit) {
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        // Se não tivermos permissão, PEDIMOS AGORA
+        if (!hasFineLocation && !hasCoarseLocation) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -41,12 +89,30 @@ fun ProtectedDashboard(viewModel: AuthViewModel) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // --- SECÇÃO DO CÓDIGO DE ASSOCIAÇÃO (OTP) ---
+        // --- MENSAGENS DE FEEDBACK DO PÂNICO ---
+        if (protegidoViewModel.successMessage != null) {
+            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFD4EDDA))) {
+                Text(
+                    text = protegidoViewModel.successMessage!!,
+                    modifier = Modifier.padding(16.dp),
+                    color = Color(0xFF155724)
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (protegidoViewModel.errorMessage != null) {
+            Text(
+                text = protegidoViewModel.errorMessage!!,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // --- SECÇÃO DO CÓDIGO DE ASSOCIAÇÃO (OTP) - Mantida no AuthViewModel ---
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -57,19 +123,16 @@ fun ProtectedDashboard(viewModel: AuthViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
-
                 Text(
-                    text = "Gere um código para dar ao seu cuidador/monitor. O código expirará assim que for utilizado.",
+                    text = "Partilhe este código com o seu Monitor para ele o poder acompanhar.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center
                 )
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Se houver um código gerado, mostra-o com destaque
-                viewModel.connectionCode?.let { code ->
+                // Código Gerado
+                authViewModel.connectionCode?.let { code ->
                     Surface(
                         color = MaterialTheme.colorScheme.primary,
                         shape = MaterialTheme.shapes.medium
@@ -84,55 +147,55 @@ fun ProtectedDashboard(viewModel: AuthViewModel) {
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Código ativo",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Text("Código ativo", style = MaterialTheme.typography.labelSmall)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = { viewModel.generateCode() },
+                    onClick = { authViewModel.generateCode() },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !viewModel.isLoading
+                    enabled = !authViewModel.isLoading
                 ) {
-                    if (viewModel.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp), // O tamanho define-se aqui
-                            color = MaterialTheme.colorScheme.onPrimary,strokeWidth = 2.dp // Opcional: define a espessura da linha
-                        )
+                    if (authViewModel.isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
                     } else {
-                        Text(if (viewModel.connectionCode == null) "Gerar Novo Código" else "Gerar Outro Código")
+                        Text(if (authViewModel.connectionCode == null) "Gerar Novo Código" else "Gerar Outro Código")
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f)) // Empurra o botão de pânico para o fundo
+        Spacer(modifier = Modifier.weight(1f))
 
-        // --- BOTÃO DE PÂNICO (Requisito Crítico II-22) ---
+        // --- BOTÃO DE PÂNICO (Lógica no ProtegidoViewModel) ---
         Button(
-            onClick = { /* Implementaremos a lógica de alerta depois */ },
+            onClick = {
+                if (user != null) {
+                    protegidoViewModel.sendPanicAlert(user)
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(100.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error
-            ),
-            shape = MaterialTheme.shapes.large
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            shape = MaterialTheme.shapes.large,
+            enabled = !protegidoViewModel.isLoading // Evita cliques duplos
         ) {
-            Text(
-                text = "BOTÃO DE PÂNICO",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Black
-            )
+            if (protegidoViewModel.isLoading) {
+                CircularProgressIndicator(color = Color.White)
+            } else {
+                Text(
+                    text = "BOTÃO DE PÂNICO",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(onClick = { viewModel.onLogoutClick { /* Navegação tratada pelo NavHost */ } }) {
+        TextButton(onClick = { authViewModel.onLogoutClick { /* Navegação no NavHost */ } }) {
             Text("Terminar Sessão")
         }
     }

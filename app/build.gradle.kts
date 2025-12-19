@@ -46,6 +46,7 @@ dependencies {
     // 1. Google Maps (Para ver a localização GPS no Dashboard)
     implementation("com.google.maps.android:maps-compose:4.3.0")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // 2. Navegação e Ciclo de Vida (Essencial para Jetpack Compose)
     implementation("androidx.navigation:navigation-compose:2.7.7")
@@ -70,6 +71,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
    // implementation(libs.androidx.compose.animation.core.lint)
     implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.play.services.location)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

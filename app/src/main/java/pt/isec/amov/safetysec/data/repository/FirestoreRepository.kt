@@ -78,4 +78,21 @@ class FirestoreRepository {
             Result.failure(e)
         }
     }
+
+    // Função para criar o Alerta na Base de Dados
+    suspend fun createAlert(alert: Alert): Result<Unit> {
+        return try {
+            // Cria um ID automático para o alerta se não tiver
+            val docRef = db.collection("alerts").document()
+
+            // gravamos o objeto mas com o ID gerado pelo Firestore
+            db.collection("alerts").document(docRef.id)
+                .set(alert)
+                .await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
