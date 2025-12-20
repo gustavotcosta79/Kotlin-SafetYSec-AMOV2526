@@ -31,6 +31,7 @@ class AuthViewModel : ViewModel() {
     // Estados de controlo da UI
     var isLoading by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
+    var successMessage by mutableStateOf<String?>(null)
 
     // Utilizador e Códigos de Associação
     var currentUser by mutableStateOf<User?>(null)
@@ -46,10 +47,91 @@ class AuthViewModel : ViewModel() {
         private set
     var codeInput by mutableStateOf("") // Código que o Monitor escreve
 
+    var editName by mutableStateOf("")
+    var editCancellationCode by mutableStateOf("")
+    var editPassword by mutableStateOf("")
+    var editConfirmPassword by mutableStateOf("")
+
     init {
         // Se já existir sessão, carrega o perfil ao iniciar o ViewModel
         if (auth.currentUser != null) {
             fetchCurrentUser()
+        }
+    }
+
+    fun initializeEditState() {
+        currentUser?.let { user ->
+            editName = user.name
+            editCancellationCode = user.cancellationCode
+            editPassword = ""
+            editConfirmPassword = ""
+            errorMessage = null
+            successMessage = null // (Adiciona esta var no topo do VM se não tiveres)
+        }
+    }
+
+    var profileUpdateSuccess by mutableStateOf(false)
+    fun onSaveChangesClick() {
+        val user = currentUser ?: return
+        errorMessage = null
+        profileUpdateSuccess = false
+        isLoading = true
+
+        viewModelScope.launch {
+            val updates = mutableMapOf<String, Any>()
+
+            // 1. Verificar alterações de Nome
+            if (editName.isNotBlank() && editName != user.name) {
+                updates["name"] = editName
+            }
+
+            // 2. Verificar alterações de Código (Só Protegido)
+            if (user.isProtected) {
+                if (editCancellationCode.length < 4) {
+                    errorMessage = "O código deve ter pelo menos 4 dígitos."
+                    isLoading = false
+                    return@launch
+                }
+                if (editCancellationCode != user.cancellationCode) {
+                    updates["cancellationCode"] = editCancellationCode
+                }
+            }
+
+            // 3. Atualizar na BD
+            if (updates.isNotEmpty()) {
+                val result = firestoreRepository.updateUserProfile(user.id, updates)
+                if (result.isFailure) {
+                    errorMessage = "Erro ao atualizar dados: ${result.exceptionOrNull()?.message}"
+                    isLoading = false
+                    return@launch
+                }
+            }
+
+            // 4. Atualizar Password (se preenchida)
+            if (editPassword.isNotBlank()) {
+                if (editPassword != editConfirmPassword) {
+                    errorMessage = "As passwords não coincidem."
+                    isLoading = false
+                    return@launch
+                }
+                if (editPassword.length < 6) {
+                    errorMessage = "A password deve ter pelo menos 6 caracteres."
+                    isLoading = false
+                    return@launch
+                }
+
+                val passResult = authRepository.updatePassword(editPassword)
+                if (passResult.isFailure) {
+                    errorMessage = "Erro ao atualizar password. Talvez precise de fazer login novamente."
+                    isLoading = false
+                    return@launch
+                }
+            }
+
+            // Sucesso Total
+            fetchCurrentUser() // Atualiza os dados locais
+            isLoading = false
+            profileUpdateSuccess = true
         }
     }
 

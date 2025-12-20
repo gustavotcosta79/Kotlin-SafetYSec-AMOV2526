@@ -4,6 +4,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import pt.isec.amov.safetysec.data.model.User
+import pt.isec.amov.safetysec.ui.screens.auth.RegisterScreen
 
 class AuthRepository {
     private val auth = FirebaseAuth.getInstance()
@@ -57,6 +58,15 @@ class AuthRepository {
             snapshot.toObject(User::class.java)
         } catch (e: Exception) {
             null
+        }
+    }
+
+    suspend fun updatePassword (newPass: String): Result <Unit> {
+        return try {
+            auth.currentUser?.updatePassword(newPass)?.await()
+            Result.success(Unit)
+        }catch (e: Exception){
+            Result.failure(e)
         }
     }
 

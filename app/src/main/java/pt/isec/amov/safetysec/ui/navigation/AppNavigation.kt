@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import pt.isec.amov.safetysec.ui.screens.auth.LoginScreen
 import pt.isec.amov.safetysec.ui.screens.auth.RegisterScreen
 import pt.isec.amov.safetysec.ui.screens.MainDashboardScreen
+import pt.isec.amov.safetysec.ui.screens.profile.ProfileScreen
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 @Composable
 fun AppNavigation() {
@@ -47,7 +48,16 @@ fun AppNavigation() {
                     navController.navigate(Screen.Login.route){
                         popUpTo(Screen.Dashboard.route) {inclusive = true}
                     }
+                },
+                onNavigateToProfile = {
+                    navController.navigate(Screen.Profile.route)
                 }
+            )
+        }
+        composable(Screen.Profile.route) {
+            ProfileScreen(
+                viewModel = authViewModel,
+                onBack = { navController.popBackStack() }
             )
         }
     }

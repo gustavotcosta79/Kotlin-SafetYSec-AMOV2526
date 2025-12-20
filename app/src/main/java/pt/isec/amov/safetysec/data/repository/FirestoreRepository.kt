@@ -1,5 +1,7 @@
 package pt.isec.amov.safetysec.data.repository
 
+import androidx.compose.runtime.Updater
+import com.google.android.gms.common.api.internal.ApiExceptionMapper
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import kotlinx.coroutines.tasks.await
@@ -136,6 +138,15 @@ class FirestoreRepository {
                 ).await()
             Result.success(Unit)
         } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateUserProfile (userId : String, updates: Map<String, Any>): Result<Unit>{
+        return try {
+            db.collection("users").document(userId).update(updates).await()
+            Result.success(Unit)
+        }catch (e : Exception){
             Result.failure(e)
         }
     }

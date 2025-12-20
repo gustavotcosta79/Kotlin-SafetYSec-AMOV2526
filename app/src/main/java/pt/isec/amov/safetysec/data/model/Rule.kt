@@ -12,7 +12,7 @@ class Rule (
     val latitude: Double? = null,
     val longitude: Double? =null,
     val radius: Double? = null,
-
+    
     val monitorId: String = "", // para sabermos que monitor criou a regra
     val protectedId: String = "" // para sabermos a que protegido se aplica
 

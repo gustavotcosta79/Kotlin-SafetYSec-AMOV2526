@@ -13,7 +13,7 @@ import pt.isec.amov.safetysec.ui.screens.protected.ProtectedDashboard
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 
 @Composable
-fun MainDashboardScreen(authViewModel: AuthViewModel,onNavigateToLogin: () -> Unit) {
+fun MainDashboardScreen(authViewModel: AuthViewModel,onNavigateToLogin: () -> Unit,onNavigateToProfile: () -> Unit) {
     val user = authViewModel.currentUser
 
     // 1. Lógica de Carregamento (tua abordagem)
@@ -65,11 +65,12 @@ fun MainDashboardScreen(authViewModel: AuthViewModel,onNavigateToLogin: () -> Un
             // 3. Decisão de ecrã baseada na seleção da tab (Fusão)
             if (isMonitorTabSelected && user.isMonitor) {
                 MonitorDashboard(authViewModel,
-                    onLogout = onNavigateToLogin)
+                    onLogout = onNavigateToLogin,
+                    onNavigateToProfile = onNavigateToProfile)
             } else if (user.isProtected) {
                 ProtectedDashboard(authViewModel,
-                onLogout = onNavigateToLogin
-                )
+                    onLogout = onNavigateToLogin,
+                    onNavigateToProfile = onNavigateToProfile)
             }
         }
     }

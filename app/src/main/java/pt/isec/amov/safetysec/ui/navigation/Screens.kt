@@ -5,6 +5,7 @@ sealed class Screen(val route: String) {
     object Register : Screen("register")
     object Dashboard : Screen("dashboard")
     object MainApp : Screen("main_app")
+    object Profile : Screen("profile")
 
     // Futuros Dashboards (para onde vamos se o login correr bem)
     object MonitorDashboard : Screen("monitor_dashboard")

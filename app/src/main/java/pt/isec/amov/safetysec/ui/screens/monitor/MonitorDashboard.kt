@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -19,7 +20,7 @@ import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 
 @Composable
-fun MonitorDashboard(authViewModel: AuthViewModel, onLogout: () -> Unit) {
+fun MonitorDashboard(authViewModel: AuthViewModel, onLogout: () -> Unit,onNavigateToProfile: () -> Unit) {
 
     // --- ESTADOS PARA O MAPA ---
     var userParaMapa by remember { mutableStateOf<Pair<User, LatLng?>?>(null) }
@@ -53,8 +54,14 @@ fun MonitorDashboard(authViewModel: AuthViewModel, onLogout: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Text("Painel do Monitor", style = MaterialTheme.typography.headlineSmall)
 
+            //icon p ver o perfil
+            IconButton(onClick = onNavigateToProfile) {
+                Icon(Icons.Default.AccountCircle, "Perfil")
+            }
+            //dar logout
             TextButton(onClick = {
                 authViewModel.onLogoutClick { onLogout() }
             }) {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +35,7 @@ import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModelFactory
 @Composable
 fun ProtectedDashboard(
     authViewModel: AuthViewModel,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,onNavigateToProfile: () -> Unit
 ) {
     val context = LocalContext.current
     val user = authViewModel.currentUser
@@ -81,7 +82,18 @@ fun ProtectedDashboard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Área do Protegido", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Row {
+                // Botão Perfil
+                IconButton(onClick = onNavigateToProfile) {
+                    Icon(Icons.Default.AccountCircle, "Perfil")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) {
+                    Text("Terminar Sessão")
+                }
+            }
 
             // MENSAGENS FEEDBACK
             if (protegidoViewModel.successMessage != null) {
@@ -171,10 +183,6 @@ fun ProtectedDashboard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) {
-                Text("Terminar Sessão")
-            }
         }
 
         // 2. CAMADA DE TOPO (O Overlay Manual do Diálogo)
