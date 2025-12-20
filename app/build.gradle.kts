@@ -47,6 +47,7 @@ dependencies {
     implementation("com.google.maps.android:maps-compose:4.3.0")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.maps.android:maps-compose:4.3.0")
 
     // 2. Navegação e Ciclo de Vida (Essencial para Jetpack Compose)
     implementation("androidx.navigation:navigation-compose:2.7.7")
@@ -59,6 +60,8 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
+
+
 
 
     implementation(libs.androidx.core.ktx)

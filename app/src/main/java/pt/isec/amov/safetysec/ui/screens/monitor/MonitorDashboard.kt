@@ -1,112 +1,143 @@
 package pt.isec.amov.safetysec.ui.screens.monitor
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
+import com.google.android.gms.maps.model.LatLng
+import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
-
-//@Composable
-//fun MonitorDashboard(viewModel: AuthViewModel) {
-//    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-//        Text("Monitor Dashboard", style = MaterialTheme.typography.headlineMedium)
-//
-//        Spacer(modifier = Modifier.height(16.dp))
-//
-//        // Seção de Alertas Recentes [cite: 52]
-//        Text("Recent Alerts", style = MaterialTheme.typography.titleMedium)
-//        // Aqui usarias uma LazyColumn para listar os alertas vindos do FirestoreRepository
-//
-//        Spacer(modifier = Modifier.height(16.dp))
-//
-//        // Lista de Protegidos Associados [cite: 55]
-//        Text("Protected Users", style = MaterialTheme.typography.titleMedium)
-//
-//        // Botão para associar novo Protegido via OTP [cite: 61, 18]
-//        Button(onClick = { /* Abrir diálogo para inserir código OTP */ }) {
-//            Text("Link New Protected User")
-//        }
-//    }
-//}
-
 
 @Composable
 fun MonitorDashboard(viewModel: AuthViewModel) {
+    // Inicia a escuta de alertas em tempo real ao abrir o ecrã
+    LaunchedEffect(Unit) {
+        viewModel.startObservingAlerts()
+    }
+
+    // --- ESTADOS PARA O MAPA ---
+    var userParaMapa by remember { mutableStateOf<Pair<User, LatLng?>?>(null) }
+
+    // --- LÓGICA DO DIÁLOGO DO MAPA ---
+    if (userParaMapa != null && userParaMapa?.second != null) {
+        AlertDialog(
+            onDismissRequest = { userParaMapa = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false), // Permite mapa maior
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            confirmButton = {
+                Button(onClick = { userParaMapa = null }) { Text("Fechar") }
+            },
+            text = {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Chama o MapScreen que criaste (precisa de estar no projeto)
+                    MapScreen(
+                        latitude = userParaMapa!!.second!!.latitude,
+                        longitude = userParaMapa!!.second!!.longitude,
+                        title = userParaMapa!!.first.name
+                    )
+                }
+            }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Painel do Monitor", style = MaterialTheme.typography.headlineSmall)
 
-        // MOSTRAR ERRO SE EXISTIR
-        viewModel.errorMessage?.let { error ->
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(bottom = 8.dp),
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // UI para introduzir o código OTP
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Adicionar Novo Protegido", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-
+        // 1. SECÇÃO DE ADICIONAR PROTEGIDO (Compacta)
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 OutlinedTextField(
                     value = viewModel.codeInput,
                     onValueChange = { viewModel.codeInput = it },
-                    label = { Text("Introduza o código (ex: AJ39K2)") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("Inserir Código OTP") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = { viewModel.onLinkSubmit { /* Aqui podes mostrar uma mensagem de sucesso */ } },
-                    modifier = Modifier.align(Alignment.End),
+                    onClick = { viewModel.onLinkSubmit { /* Feedback sucesso */ } },
                     enabled = !viewModel.isLoading
                 ) {
-                    Text("Associar")
+                    Text("Ligar")
                 }
             }
         }
 
-        Text("Meus Protegidos", style = MaterialTheme.typography.titleMedium)
+        // 2. LISTA DE UTILIZADORES
+        Text(
+            "Meus Protegidos",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
-        LazyColumn {
+        LazyColumn(modifier = Modifier.weight(1f)) {
             items(viewModel.monitoredUsers) { protegido ->
-                ListItem(
-                    headlineContent = { Text(protegido.name) },
-                    supportingContent = { Text(protegido.email) },
-                    leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
-                    trailingContent = {
-                        // Botão para ver mapa ou detalhes no futuro
-                        IconButton(onClick = { /* Navegar para Detalhes */ }) {
-                            Icon(Icons.Default.LocationOn, contentDescription = "Ver Localização")
+                // Verifica se este protegido tem um alerta ativo
+                val alertaVinculado = viewModel.activeAlerts.find { it.userEmail == protegido.email }
+                val temAlerta = alertaVinculado != null
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (temAlerta) MaterialTheme.colorScheme.errorContainer
+                        else MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text(protegido.name, fontWeight = FontWeight.Bold) },
+                        supportingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Badge(containerColor = if (temAlerta) Color.Red else Color(0xFF4CAF50))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (temAlerta) "EM EMERGÊNCIA" else "Seguro")
+                            }
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Person,
+                                contentDescription = null,
+                                tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        trailingContent = {
+                            // BOTÃO DE LOCALIZAÇÃO QUE ABRE O MAPA INTERNO
+                            IconButton(onClick = {
+                                // Prioridade: Localização do alerta. Alternativa: Última conhecida do user.
+                                val lat = alertaVinculado?.latitude ?: protegido.lastLatitude
+                                val lon = alertaVinculado?.longitude ?: protegido.lastLongitude
+
+                                if (lat != null && lon != null) {
+                                    userParaMapa = Pair(protegido, LatLng(lat, lon))
+                                } else {
+                                    // Podes mostrar um Toast ou erro no ViewModel aqui
+                                }
+                            }) {
+                                Icon(
+                                    Icons.Default.LocationOn,
+                                    contentDescription = "Ver no Mapa",
+                                    tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.outline
+                                )
+                            }
                         }
-                    }
-                )
-                HorizontalDivider()
+                    )
+                }
             }
         }
     }

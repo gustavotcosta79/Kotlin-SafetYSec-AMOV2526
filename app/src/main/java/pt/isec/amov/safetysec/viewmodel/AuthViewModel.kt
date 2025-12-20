@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import pt.isec.amov.safetysec.data.model.Alert
 import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.data.repository.AuthRepository
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
@@ -41,12 +42,26 @@ class AuthViewModel : ViewModel() {
     var monitoredUsers by mutableStateOf<List<User>>(emptyList())
         private set
 
+    var activeAlerts by mutableStateOf<List<Alert>>(emptyList())
+        private set
     var codeInput by mutableStateOf("") // Código que o Monitor escreve
 
     init {
         // Se já existir sessão, carrega o perfil ao iniciar o ViewModel
         if (auth.currentUser != null) {
             fetchCurrentUser()
+        }
+    }
+
+    fun startObservingAlerts() {
+        val user = currentUser ?: return
+        // Usamos os emails ou IDs dos protegidos associados
+        val targets = monitoredUsers.map { it.email }
+
+        if (targets.isNotEmpty()) {
+            firestoreRepository.listenForAlerts(targets) { alerts ->
+                activeAlerts = alerts
+            }
         }
     }
 

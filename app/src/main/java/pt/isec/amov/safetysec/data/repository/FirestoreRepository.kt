@@ -95,4 +95,20 @@ class FirestoreRepository {
             Result.failure(e)
         }
     }
+
+    // No FirestoreRepository.kt
+    fun listenForAlerts(protectedIds: List<String>, onAlertsReceived: (List<Alert>) -> Unit) {
+        if (protectedIds.isEmpty()) return
+
+        db.collection("alerts")
+            .whereIn("userEmail", protectedIds) // Filtra pelos ecrãs que o monitor vigia
+            .whereEqualTo("solved", false)      // Apenas alertas ativos
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) return@addSnapshotListener
+
+                val alerts = snapshot?.toObjects(Alert::class.java) ?: emptyList()
+                onAlertsReceived(alerts)
+            }
+    }
+
 }
