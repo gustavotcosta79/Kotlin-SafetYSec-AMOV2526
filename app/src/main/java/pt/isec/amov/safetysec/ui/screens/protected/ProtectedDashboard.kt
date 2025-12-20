@@ -26,7 +26,8 @@ import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModelFactory
 
 @Composable
 fun ProtectedDashboard(
-    authViewModel: AuthViewModel // Usado para saber QUEM é o user e gerir o OTP
+    authViewModel: AuthViewModel, // Usado para saber QUEM é o user e gerir o OTP
+    onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     val user = authViewModel.currentUser
@@ -195,7 +196,7 @@ fun ProtectedDashboard(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(onClick = { authViewModel.onLogoutClick { /* Navegação no NavHost */ } }) {
+        TextButton(onClick = { authViewModel.onLogoutClick {onLogout()} }) {
             Text("Terminar Sessão")
         }
     }

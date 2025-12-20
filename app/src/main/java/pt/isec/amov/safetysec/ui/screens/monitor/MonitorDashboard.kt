@@ -19,10 +19,10 @@ import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 
 @Composable
-fun MonitorDashboard(viewModel: AuthViewModel) {
+fun MonitorDashboard(authViewModel: AuthViewModel, onLogout: () -> Unit) {
     // Inicia a escuta de alertas em tempo real ao abrir o ecrã
     LaunchedEffect(Unit) {
-        viewModel.startObservingAlerts()
+        authViewModel.startObservingAlerts()
     }
 
     // --- ESTADOS PARA O MAPA ---
@@ -51,7 +51,22 @@ fun MonitorDashboard(viewModel: AuthViewModel) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Painel do Monitor", style = MaterialTheme.typography.headlineSmall)
+        // --- CABEÇALHO COM LOGOUT ---
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Painel do Monitor", style = MaterialTheme.typography.headlineSmall)
+
+            TextButton(onClick = {
+                authViewModel.onLogoutClick { onLogout() }
+            }) {
+                Text("Terminar Sessão")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 1. SECÇÃO DE ADICIONAR PROTEGIDO (Compacta)
         Card(
@@ -63,16 +78,16 @@ fun MonitorDashboard(viewModel: AuthViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
-                    value = viewModel.codeInput,
-                    onValueChange = { viewModel.codeInput = it },
+                    value = authViewModel.codeInput,
+                    onValueChange = { authViewModel.codeInput = it },
                     label = { Text("Inserir Código OTP") },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = { viewModel.onLinkSubmit { /* Feedback sucesso */ } },
-                    enabled = !viewModel.isLoading
+                    onClick = { authViewModel.onLinkSubmit { /* Feedback sucesso */ } },
+                    enabled = !authViewModel.isLoading
                 ) {
                     Text("Ligar")
                 }
@@ -87,9 +102,9 @@ fun MonitorDashboard(viewModel: AuthViewModel) {
         )
 
         LazyColumn(modifier = Modifier.weight(1f)) {
-            items(viewModel.monitoredUsers) { protegido ->
+            items(authViewModel.monitoredUsers) { protegido ->
                 // Verifica se este protegido tem um alerta ativo
-                val alertaVinculado = viewModel.activeAlerts.find { it.userEmail == protegido.email }
+                val alertaVinculado = authViewModel.activeAlerts.find { it.userEmail == protegido.email }
                 val temAlerta = alertaVinculado != null
 
                 Card(

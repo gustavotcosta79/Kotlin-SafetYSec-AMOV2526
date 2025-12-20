@@ -42,7 +42,13 @@ fun AppNavigation() {
 
         // FICA APENAS COM ESTA ROTA
         composable(Screen.Dashboard.route) {
-            MainDashboardScreen(authViewModel = authViewModel)
+            MainDashboardScreen(authViewModel = authViewModel,
+                onNavigateToLogin = {
+                    navController.navigate(Screen.Login.route){
+                        popUpTo(Screen.Dashboard.route) {inclusive = true}
+                    }
+                }
+            )
         }
     }
 }
