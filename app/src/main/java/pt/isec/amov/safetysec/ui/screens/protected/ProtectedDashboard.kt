@@ -47,12 +47,17 @@ fun ProtectedDashboard(
         )
     )
 
-    // ESTADOS
+    // --- ESTADOS DA UI ---
     var showCancelDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
-    val isInPanicMode = protegidoViewModel.activeAlertId != null
 
-    // PERMISSÕES
+    // --- ESTADOS DO VIEWMODEL (Lógica dos 10s) ---
+    val isCounting = protegidoViewModel.isCountingDown
+    val isAlertSent = protegidoViewModel.activeAlertId != null
+    // Se estiver a contar OU se já enviou, o botão serve para cancelar
+    val isInCancelMode = isCounting || isAlertSent
+
+    // --- PERMISSÕES ---
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { }
@@ -65,11 +70,10 @@ fun ProtectedDashboard(
         }
     }
 
-    // --- ESTRUTURA PRINCIPAL (BOX para permitir sobreposição) ---
-    // Usamos Box para podermos meter coisas "umas em cima das outras"
+    // --- ESTRUTURA PRINCIPAL (BOX para o Overlay Manual) ---
     Box(modifier = Modifier.fillMaxSize()) {
 
-        // 1. O CONTEÚDO NORMAL DA APP (Fica por baixo)
+        // 1. CAMADA DE FUNDO (A Aplicação Normal)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -114,20 +118,29 @@ fun ProtectedDashboard(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // BOTÃO DE PÂNICO
+            // --- BOTÃO DE PÂNICO INTELIGENTE ---
             Button(
                 onClick = {
-                    if (isInPanicMode) {
+                    if (isInCancelMode) {
+                        // Se está a contar ou já enviou -> Abre diálogo para cancelar
                         pinInput = ""
-                        showCancelDialog = true // ISTO VAI ATIVAR O ITEM Nº 2 ABAIXO
+                        showCancelDialog = true
                     } else {
-                        if (user != null) protegidoViewModel.sendPanicAlert(user)
+                        // Se está normal -> Inicia a contagem de 10s
+                        if (user != null) {
+                            protegidoViewModel.startPanicProcess(user)
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(100.dp),
                 shape = MaterialTheme.shapes.large,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isInPanicMode) Color(0xFFFFA000) else MaterialTheme.colorScheme.error
+                    // Laranja (Aviso 10s) | Vermelho Escuro (Enviado) | Vermelho Vivo (Normal)
+                    containerColor = when {
+                        isCounting -> Color(0xFFFF9800)
+                        isAlertSent -> Color(0xFFD32F2F)
+                        else -> Color.Red
+                    }
                 ),
                 enabled = !protegidoViewModel.isLoading
             ) {
@@ -136,11 +149,24 @@ fun ProtectedDashboard(
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(32.dp))
+
+                        // TEXTO DINÂMICO
                         Text(
-                            text = if (isInPanicMode) "CANCELAR ALERTA" else "BOTÃO DE PÂNICO",
-                            fontSize = 22.sp, fontWeight = FontWeight.Black
+                            text = when {
+                                isCounting -> "A ENVIAR EM ${protegidoViewModel.countdownValue}s..."
+                                isAlertSent -> "CANCELAR ALERTA"
+                                else -> "BOTÃO DE PÂNICO"
+                            },
+                            fontSize = if (isCounting) 24.sp else 22.sp,
+                            fontWeight = FontWeight.Black
                         )
-                        if (isInPanicMode) Text("Modo SOS Ativo", fontSize = 14.sp)
+
+                        if (isInCancelMode) {
+                            Text(
+                                text = if (isCounting) "Toque para abortar" else "Modo SOS Ativo",
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
             }
@@ -151,30 +177,23 @@ fun ProtectedDashboard(
             }
         }
 
-        // 2. O OVERLAY MANUAL (DIÁLOGO FEITO À MÃO)
-        // Este bloco só é desenhado se showCancelDialog for true.
-        // Como está no fim da Box, fica POR CIMA de tudo (z-index maior).
+        // 2. CAMADA DE TOPO (O Overlay Manual do Diálogo)
         if (showCancelDialog) {
-            // Fundo escuro transparente que ocupa o ecrã todo
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f)) // Efeito de escurecer o fundo
-                    .zIndex(2f) // Garante que fica no topo
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .zIndex(2f) // Garante prioridade visual
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) {
-                        // Clicar fora fecha o diálogo
-                        showCancelDialog = false
-                    },
+                    ) { showCancelDialog = false }, // Fechar ao clicar fora
                 contentAlignment = Alignment.Center
             ) {
-                // A "Janela" do diálogo (Cartão branco)
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth(0.9f) // Ocupa 90% da largura
-                        .clickable(enabled = false) {}, // Impede que cliques no cartão fechem o diálogo
+                        .fillMaxWidth(0.9f)
+                        .clickable(enabled = false) {}, // Impede clique no cartão de fechar
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFEEEEEE)),
                     elevation = CardDefaults.cardElevation(8.dp)
                 ) {
@@ -185,7 +204,7 @@ fun ProtectedDashboard(
                         Text("Cancelar Emergência", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Text("Introduza o seu PIN para cancelar o alerta.", color = Color.Black)
+                        Text("Introduza o seu PIN para cancelar.", color = Color.Black)
                         Spacer(modifier = Modifier.height(16.dp))
 
                         OutlinedTextField(
@@ -217,7 +236,8 @@ fun ProtectedDashboard(
                             Button(
                                 onClick = {
                                     if (user != null) {
-                                        protegidoViewModel.cancelPanicAlert(pinInput, user.cancellationCode)
+                                        // Chama a nova função inteligente do ViewModel
+                                        protegidoViewModel.handleCancelRequest(pinInput, user.cancellationCode)
                                         showCancelDialog = false
                                     }
                                 }

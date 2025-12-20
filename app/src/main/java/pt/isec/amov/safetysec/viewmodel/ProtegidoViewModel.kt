@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pt.isec.amov.safetysec.data.model.Alert
 import pt.isec.amov.safetysec.data.model.RuleType
@@ -26,6 +28,31 @@ class ProtegidoViewModel (
     var successMessage by mutableStateOf<String?>(null)
     var activeAlertId by mutableStateOf<String?>(null) //se for null está tudo nice
 
+    var isCountingDown by mutableStateOf(false)
+    var countdownValue by mutableStateOf(10)
+    private var countdownJob: Job? = null
+
+    fun startPanicProcess(user: User) {
+        if (activeAlertId != null) return // Já existe um alerta real, ignora
+
+        // Prepara a contagem
+        isCountingDown = true
+        countdownValue = 10
+        errorMessage = null
+        successMessage = null
+
+        // Inicia a corrotina do timer
+        countdownJob = viewModelScope.launch {
+            while (countdownValue > 0) {
+                delay(1000L) // Espera 1 segundo
+                countdownValue--
+            }
+
+            // SE CHEGAR AQUI, O TEMPO ACABOU! ENVIAR ALERTA REAL!
+            isCountingDown = false
+            sendPanicAlert(user)
+        }
+    }
     fun sendPanicAlert (user : User){
         isLoading = true
         errorMessage = null
@@ -63,35 +90,39 @@ class ProtegidoViewModel (
             }
         }
     }
-    fun cancelPanicAlert (inputPin: String, correctPin: String){
-        if (inputPin != correctPin ){
-            errorMessage = "PIN incorreto! O alerta continua ativo"
+
+    fun handleCancelRequest(inputPin: String, correctPin: String) {
+        if (inputPin != correctPin) {
+            errorMessage = "PIN incorreto!"
             return
         }
 
-        val alertId = activeAlertId
-        if (alertId == null){
-            errorMessage = "Nenhum alerta para cancelar"
+        // CASO A: Estamos na contagem decrescente?
+        if (isCountingDown) {
+            countdownJob?.cancel() // Pára o relógio
+            isCountingDown = false
+            countdownValue = 10
+            successMessage = "Envio abortado. Nada foi enviado."
             return
         }
 
-        isLoading = true
-        errorMessage = null
-
-        viewModelScope.launch {
-            // Chama a função de cancelar no repositório
-            val result = firestoreRepository.cancelAlert(alertId)
-
-            isLoading = false
-            if (result.isSuccess){
-                activeAlertId = null //sai do modo de panico
-                successMessage = "Alerta cancelado com sucesso"
-            }
-            else {
-                errorMessage = "Erro ao cancelar o alerta: ${result.exceptionOrNull()?.message}"
-            }
+        // CASO B: O alerta já foi enviado?
+        if (activeAlertId != null) {
+            cancelPanicAlert(activeAlertId!!)
         }
     }
+    fun cancelPanicAlert (alertId: String){
+        isLoading = true
+        viewModelScope.launch {
+            val result = firestoreRepository.cancelAlert(alertId)
+            isLoading = false
+            if (result.isSuccess) {
+                activeAlertId = null
+                successMessage = "Alerta na base de dados cancelado."
+            } else {
+                errorMessage = "Erro ao cancelar na BD."
+            }
+        }    }
 }
 
 
