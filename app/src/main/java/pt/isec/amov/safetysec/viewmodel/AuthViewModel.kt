@@ -55,7 +55,7 @@ class AuthViewModel : ViewModel() {
 
     fun startObservingAlerts() {
         val user = currentUser ?: return
-        // Usamos os emails ou IDs dos protegidos associados
+        // Usamos os emails dos protegidos que já estão na lista monitoredUsers
         val targets = monitoredUsers.map { it.email }
 
         if (targets.isNotEmpty()) {
@@ -75,8 +75,7 @@ class AuthViewModel : ViewModel() {
 
     fun fetchMonitoredUsers() {
         val user = currentUser ?: return
-        // Usando o nome correto da tua classe User
-        if (!user.isMonitor || user.associatedProtegidoIds.isEmpty()) {
+        if (!user.isMonitor || user.associatedMonitorIds .isEmpty()) {
             monitoredUsers = emptyList()
             return
         }
@@ -85,6 +84,8 @@ class AuthViewModel : ViewModel() {
             val result = firestoreRepository.getAssociatedUsers(user.associatedProtegidoIds)
             if (result.isSuccess) {
                 monitoredUsers = result.getOrNull() ?: emptyList()
+                // NOVO: Começa a ouvir alertas mal acabas de carregar a lista de protegidos
+                startObservingAlerts()
             }
         }
     }

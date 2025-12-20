@@ -20,10 +20,6 @@ import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 
 @Composable
 fun MonitorDashboard(authViewModel: AuthViewModel, onLogout: () -> Unit) {
-    // Inicia a escuta de alertas em tempo real ao abrir o ecrã
-    LaunchedEffect(Unit) {
-        authViewModel.startObservingAlerts()
-    }
 
     // --- ESTADOS PARA O MAPA ---
     var userParaMapa by remember { mutableStateOf<Pair<User, LatLng?>?>(null) }

@@ -16,6 +16,7 @@ class User (
      var isProtected: Boolean = false,
 
     val cancellationCode: String = "1234",
+     val connectionCode: String? = null, // ADICIONA ESTA LINHA
     val associatedMonitorIds: List <String> = emptyList(),
     val associatedProtegidoIds: List <String> = emptyList(),
 

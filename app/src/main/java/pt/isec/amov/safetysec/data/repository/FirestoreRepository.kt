@@ -126,4 +126,18 @@ class FirestoreRepository {
             }
     }
 
+    suspend fun updateLastLocation(userId: String, lat: Double, lon: Double, time: Long): Result<Unit> {
+        return try {
+            db.collection("users").document(userId)
+                .update(
+                    "lastLatitude", lat,
+                    "lastLongitude", lon,
+                    "lastLocationTime", time
+                ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
 }
