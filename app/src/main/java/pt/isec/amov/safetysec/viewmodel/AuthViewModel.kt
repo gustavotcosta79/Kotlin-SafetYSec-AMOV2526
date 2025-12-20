@@ -70,21 +70,31 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             val user = authRepository.getUserProfile(uid)
             currentUser = user
+
+            //tentar atualizar a lista logo ao carregar o user (se formos monitor claro)
+            if (user != null && user.isMonitor){
+                fetchMonitoredUsersDirectly(user)
+            }
         }
     }
 
+
+
     fun fetchMonitoredUsers() {
         val user = currentUser ?: return
-        if (!user.isMonitor || user.associatedMonitorIds .isEmpty()) {
+        fetchMonitoredUsersDirectly(user)
+    }
+
+    private fun fetchMonitoredUsersDirectly (user : User){
+        if (!user.isMonitor || user.associatedProtegidoIds.isEmpty()){
             monitoredUsers = emptyList()
             return
         }
 
         viewModelScope.launch {
             val result = firestoreRepository.getAssociatedUsers(user.associatedProtegidoIds)
-            if (result.isSuccess) {
+            if (result.isSuccess){
                 monitoredUsers = result.getOrNull() ?: emptyList()
-                // NOVO: Começa a ouvir alertas mal acabas de carregar a lista de protegidos
                 startObservingAlerts()
             }
         }
@@ -184,12 +194,23 @@ class AuthViewModel : ViewModel() {
 
             val result = firestoreRepository.linkMonitorToProtected(monitor.id, codeInput)
 
-            isLoading = false
             if (result.isSuccess) {
                 codeInput = ""
-                fetchCurrentUser() // Atualiza o perfil para ver a nova lista de protegidos
+                val updatedUser = authRepository.getUserProfile(monitor.id)
+                currentUser = updatedUser
+
+                if (updatedUser != null && updatedUser.isMonitor){
+                    val usersResult = firestoreRepository.getAssociatedUsers(updatedUser.associatedProtegidoIds)
+                    if (usersResult.isSuccess){
+                        monitoredUsers = usersResult.getOrNull() ?: emptyList()
+                        startObservingAlerts()
+                    }
+                }
+                isLoading = false
                 onSuccess()
+
             } else {
+                isLoading = false
                 errorMessage = result.exceptionOrNull()?.message ?: "Erro ao associar."
             }
         }
