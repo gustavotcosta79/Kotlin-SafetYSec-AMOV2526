@@ -2,6 +2,7 @@ package pt.isec.amov.safetysec.data.repository
 
 import androidx.compose.runtime.Updater
 import com.google.android.gms.common.api.internal.ApiExceptionMapper
+import androidx.room.util.copy
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import kotlinx.coroutines.tasks.await
@@ -150,5 +151,64 @@ class FirestoreRepository {
             Result.failure(e)
         }
     }
+
+
+    // 1. Monitor propõe a regra [cite: 22]
+    suspend fun proposeRule(rule: Rule): Result<Unit> {
+        return try {
+            val docRef = db.collection("rules").document()
+            val ruleWithId = rule.copy(id = docRef.id)
+            docRef.set(ruleWithId).await()
+            Result.success(Unit)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    // 2. Protegido ou Monitor listam as regras [cite: 47, 58]
+    fun listenToRules(protectedId: String, onUpdate: (List<Rule>) -> Unit) {
+        db.collection("rules")
+            .whereEqualTo("protectedId", protectedId)
+            .addSnapshotListener { snapshot, _ ->
+                val rules = snapshot?.toObjects(Rule::class.java) ?: emptyList()
+                onUpdate(rules)
+            }
+    }
+
+    // 3. Protegido aceita ou revoga a regra
+    suspend fun updateRuleStatus(ruleId: String, isEnabled: Boolean): Result<Unit> {
+        return try {
+            db.collection("rules").document(ruleId)
+                .update("isActive", isEnabled).await()
+            Result.success(Unit)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    // Função para o Monitor propor uma nova regra
+    suspend fun addRule(rule: Rule): Result<Unit> {
+        return try {
+            val docRef = db.collection("rules").document() // Gera ID automático
+            val ruleWithId = rule.copy(id = docRef.id) // Atualiza o objeto com o ID (precisas do data class aqui!)
+
+            docRef.set(ruleWithId).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Função para ler as regras de um Protegido específico
+    suspend fun getRulesForUser(protectedId: String): Result<List<Rule>> {
+        return try {
+            val snapshot = db.collection("rules")
+                .whereEqualTo("protectedId", protectedId)
+                .get()
+                .await()
+
+            val rules = snapshot.toObjects(Rule::class.java)
+            Result.success(rules)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
 
 }

@@ -1,13 +1,17 @@
 package pt.isec.amov.safetysec.data.model
 
 import android.accessibilityservice.GestureDescription
+import com.google.firebase.firestore.PropertyName
 
-class Rule (
+data class Rule (
     val id: String = "",
     val type: RuleType = RuleType.UNKNOWN,
     val description: String = "",
-    val isActive: Boolean = false, //segundo o enunciado o protegido pode revogar as regras
 
+// Forçamos o Firestore a ler/escrever sempre como "isActive"
+    @get:PropertyName("isActive")
+    @set:PropertyName("isActive")
+    var isActive: Boolean = false,
     val valueDouble: Double ? = null, // usamos este campo para armazenar a velocidade ou a inatividade
     val latitude: Double? = null,
     val longitude: Double? =null,

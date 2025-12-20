@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -32,6 +34,8 @@ import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModel
 import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModelFactory
 
+
+
 @Composable
 fun ProtectedDashboard(
     authViewModel: AuthViewModel,
@@ -39,6 +43,9 @@ fun ProtectedDashboard(
 ) {
     val context = LocalContext.current
     val user = authViewModel.currentUser
+
+
+
 
     // Factory do ViewModel
     val protegidoViewModel: ProtegidoViewModel = viewModel(
@@ -70,6 +77,14 @@ fun ProtectedDashboard(
             permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
         }
     }
+
+    // 1. INICIAR A ESCUTA DAS REGRAS
+    LaunchedEffect(user) {
+        if (user != null) {
+            protegidoViewModel.startObservingRules(user.id)
+        }
+    }
+
 
     // --- ESTRUTURA PRINCIPAL (BOX para o Overlay Manual) ---
     Box(modifier = Modifier.fillMaxSize()) {
@@ -127,6 +142,84 @@ fun ProtectedDashboard(
                     }
                 }
             }
+
+
+
+
+            // =========================================================
+            // NOVA SECÇÃO: GESTÃO DE REGRAS
+            // =========================================================
+            Text(
+                text = "Minhas Regras de Segurança",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Start)
+            )
+
+            if (protegidoViewModel.rules.isEmpty()) {
+                Text(
+                    "Nenhuma regra definida pelos monitores.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            // Usamos LazyColumn com weight para ocupar o espaço livre até ao botão de pânico
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                items(protegidoViewModel.rules) { regra ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        // Se estiver inativa, cor diferente para destacar que precisa de atenção?
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (regra.isActive) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = regra.type.name, // Ou uma função para nome mais bonito
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = regra.description,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                if (regra.valueDouble != null) {
+                                    Text(
+                                        text = "Valor: ${regra.valueDouble}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+
+                            // SWITCH PARA ACEITAR / REVOGAR
+                            Switch(
+                                checked = regra.isActive,
+                                onCheckedChange = { isChecked ->
+                                    protegidoViewModel.toggleRule(regra.id, isChecked)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
 
             Spacer(modifier = Modifier.weight(1f))
 

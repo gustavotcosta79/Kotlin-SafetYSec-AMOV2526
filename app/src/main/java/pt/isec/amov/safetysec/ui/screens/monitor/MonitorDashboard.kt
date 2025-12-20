@@ -3,8 +3,10 @@ package pt.isec.amov.safetysec.ui.screens.monitor
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -13,23 +15,41 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.maps.model.LatLng
+import pt.isec.amov.safetysec.data.model.RuleType
 import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
+import pt.isec.amov.safetysec.viewmodel.MonitorViewModel
 
 @Composable
-fun MonitorDashboard(authViewModel: AuthViewModel, onLogout: () -> Unit,onNavigateToProfile: () -> Unit) {
+fun MonitorDashboard(
+    authViewModel: AuthViewModel,
+    monitorViewModel: MonitorViewModel = viewModel(), // Injetamos o novo VM aqui
+    onLogout: () -> Unit,
+    onNavigateToProfile: () -> Unit
+) {
+    // Inicia a escuta de alertas em tempo real ao abrir o ecrã
+    LaunchedEffect(Unit) {
+        authViewModel.startObservingAlerts()
+    }
 
     // --- ESTADOS PARA O MAPA ---
     var userParaMapa by remember { mutableStateOf<Pair<User, LatLng?>?>(null) }
 
-    // --- LÓGICA DO DIÁLOGO DO MAPA ---
+    // --- ESTADO PARA O DIÁLOGO DE REGRAS ---
+    var userParaRegra by remember { mutableStateOf<User?>(null) }
+
+    // =====================================================================
+    // LÓGICA DO DIÁLOGO DO MAPA (O TEU CÓDIGO)
+    // =====================================================================
     if (userParaMapa != null && userParaMapa?.second != null) {
         AlertDialog(
             onDismissRequest = { userParaMapa = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false), // Permite mapa maior
+            properties = DialogProperties(usePlatformDefaultWidth = false),
             modifier = Modifier.fillMaxSize().padding(16.dp),
             confirmButton = {
                 Button(onClick = { userParaMapa = null }) { Text("Fechar") }
@@ -47,6 +67,87 @@ fun MonitorDashboard(authViewModel: AuthViewModel, onLogout: () -> Unit,onNaviga
         )
     }
 
+    // =====================================================================
+    // NOVA LÓGICA: DIÁLOGO PARA CRIAR REGRA
+    // =====================================================================
+    if (userParaRegra != null) {
+        val targetUser = userParaRegra!!
+
+        AlertDialog(
+            onDismissRequest = { userParaRegra = null },
+            title = { Text("Propor Regra a ${targetUser.name}") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Escolha o tipo de regra:", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Seleção Simples de Tipo (Podes melhorar com Dropdown)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        FilterChip(
+                            selected = monitorViewModel.selectedRuleType == RuleType.CONTROLO_VELOCIDADE,
+                            onClick = { monitorViewModel.selectedRuleType = RuleType.CONTROLO_VELOCIDADE },
+                            label = { Text("Veloc.") }
+                        )
+                        FilterChip(
+                            selected = monitorViewModel.selectedRuleType == RuleType.INATIVIDADE,
+                            onClick = { monitorViewModel.selectedRuleType = RuleType.INATIVIDADE },
+                            label = { Text("Inativ.") }
+                        )
+                        FilterChip(
+                            selected = monitorViewModel.selectedRuleType == RuleType.GEOFENCING,
+                            onClick = { monitorViewModel.selectedRuleType = RuleType.GEOFENCING },
+                            label = { Text("Area") }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Input de Valor
+                    OutlinedTextField(
+                        value = monitorViewModel.ruleValueInput,
+                        onValueChange = { monitorViewModel.ruleValueInput = it },
+                        label = { Text("Valor (Km/h, Minutos ou Raio)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Input de Descrição
+                    OutlinedTextField(
+                        value = monitorViewModel.ruleDescription,
+                        onValueChange = { monitorViewModel.ruleDescription = it },
+                        label = { Text("Descrição curta") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val monitorId = authViewModel.currentUser?.id ?: ""
+                        monitorViewModel.submitRule(
+                            monitorId = monitorId,
+                            protectedId = targetUser.id,
+                            onFinished = { userParaRegra = null } // Fecha o diálogo
+                        )
+                    },
+                    enabled = !monitorViewModel.isLoading
+                ) {
+                    Text(if (monitorViewModel.isLoading) "A guardar..." else "Propor Regra")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { userParaRegra = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // =====================================================================
+    // CONTEÚDO PRINCIPAL
+    // =====================================================================
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         // --- CABEÇALHO COM LOGOUT ---
         Row(

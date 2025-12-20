@@ -38,6 +38,39 @@ class ProtegidoViewModel (
     var countdownValue by mutableStateOf(10)
     private var countdownJob: Job? = null
 
+    // --- NOVA LISTA DE REGRAS ---
+    var rules by mutableStateOf<List<Rule>>(emptyList())
+        private set
+
+
+    // Inicia a escuta das regras (chamado ao entrar no ecrã)
+    fun startObservingRules(userId: String) {
+        firestoreRepository.listenToRules(userId) { listaAtualizada ->
+            rules = listaAtualizada
+        }
+    }
+
+    // Aceitar (true) ou Revogar (false) uma regra
+    fun toggleRule(ruleId: String, novoEstado: Boolean) {
+        Log.d("SafetySec", "Tentativa de alterar regra: ID='$ruleId' para Estado=$novoEstado")
+
+        if (ruleId.isBlank()) {
+            Log.e("SafetySec", "ERRO FATAL: O ID da regra está vazio! A regra não foi gravada corretamente.")
+            return
+        }
+
+        viewModelScope.launch {
+            val result = firestoreRepository.updateRuleStatus(ruleId, novoEstado)
+
+            if (result.isSuccess) {
+                Log.d("SafetySec", "SUCESSO: Estado atualizado no Firestore.")
+            } else {
+                val erro = result.exceptionOrNull()?.message
+                Log.e("SafetySec", "ERRO ao atualizar: $erro")
+            }
+        }
+    }
+
     fun startPanicProcess(user: User) {
         if (activeAlertId != null) return // Já existe um alerta real, ignora
 

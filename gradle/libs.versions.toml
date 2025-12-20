@@ -12,6 +12,7 @@ animationCoreLint = "1.10.0"
 firebaseAuthKtx = "24.0.1"
 firebaseFirestoreKtx = "26.0.2"
 playServicesLocation = "21.3.0"
+roomKtx = "2.8.4"
 
 [libraries]
 
@@ -38,6 +39,7 @@ androidx-compose-animation-core-lint = { group = "androidx.compose.animation", n
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebaseAuthKtx" }
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx", version.ref = "firebaseFirestoreKtx" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

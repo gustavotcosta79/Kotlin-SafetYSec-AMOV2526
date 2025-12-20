@@ -75,6 +75,7 @@ dependencies {
    // implementation(libs.androidx.compose.animation.core.lint)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.play.services.location)
+    implementation(libs.androidx.room.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
