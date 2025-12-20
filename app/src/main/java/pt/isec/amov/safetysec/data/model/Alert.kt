@@ -2,7 +2,7 @@ package pt.isec.amov.safetysec.data.model
 
 import java.util.Date
 
-class Alert (
+data class Alert (
     val id: String = "",
     val type: RuleType = RuleType.UNKNOWN,
     val userEmail : String = "", //apenas para display

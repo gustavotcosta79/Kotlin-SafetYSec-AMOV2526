@@ -24,6 +24,7 @@ class ProtegidoViewModel (
     var isLoading by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
     var successMessage by mutableStateOf<String?>(null)
+    var activeAlertId by mutableStateOf<String?>(null) //se for null está tudo nice
 
     fun sendPanicAlert (user : User){
         isLoading = true
@@ -43,6 +44,7 @@ class ProtegidoViewModel (
                 id = "",
                 type = RuleType.BOTAO_PANICO,
                 userEmail = user.email,
+                protectedId = user.id,
                 date = Date(),
                 latitude = location.latitude,
                 longitude = location.longitude,
@@ -54,20 +56,51 @@ class ProtegidoViewModel (
 
             isLoading = false
             if (result.isSuccess) {
+                activeAlertId = result.getOrNull()
                 successMessage = "ALERTA ENVIADO! O monitor foi notificado."
             } else {
                 errorMessage = result.exceptionOrNull()?.message ?: "Erro ao enviar alerta."
             }
         }
     }
-}
+    fun cancelPanicAlert (inputPin: String, correctPin: String){
+        if (inputPin != correctPin ){
+            errorMessage = "PIN incorreto! O alerta continua ativo"
+            return
+        }
 
-    class ProtegidoViewModelFactory(
-        private val locationManager: LocationManager,
-        private val firestoreRepository: FirestoreRepository
-    ) : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ProtegidoViewModel(locationManager, firestoreRepository) as T
+        val alertId = activeAlertId
+        if (alertId == null){
+            errorMessage = "Nenhum alerta para cancelar"
+            return
+        }
+
+        isLoading = true
+        errorMessage = null
+
+        viewModelScope.launch {
+            // Chama a função de cancelar no repositório
+            val result = firestoreRepository.cancelAlert(alertId)
+
+            isLoading = false
+            if (result.isSuccess){
+                activeAlertId = null //sai do modo de panico
+                successMessage = "Alerta cancelado com sucesso"
+            }
+            else {
+                errorMessage = "Erro ao cancelar o alerta: ${result.exceptionOrNull()?.message}"
+            }
         }
     }
+}
+
+
+class ProtegidoViewModelFactory(
+    private val locationManager: LocationManager,
+    private val firestoreRepository: FirestoreRepository
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return ProtegidoViewModel(locationManager, firestoreRepository) as T
+    }
+}

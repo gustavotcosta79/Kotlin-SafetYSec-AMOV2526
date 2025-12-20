@@ -80,23 +80,38 @@ class FirestoreRepository {
     }
 
     // Função para criar o Alerta na Base de Dados
-    suspend fun createAlert(alert: Alert): Result<Unit> {
+    suspend fun createAlert(alert: Alert): Result<String> {
         return try {
             // Cria um ID automático para o alerta se não tiver
             val docRef = db.collection("alerts").document()
+            val alertWithId = alert.copy(id = docRef.id)
 
             // gravamos o objeto mas com o ID gerado pelo Firestore
             db.collection("alerts").document(docRef.id)
-                .set(alert)
+                .set(alertWithId)
                 .await()
 
-            Result.success(Unit)
+            Result.success(docRef.id)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    // No FirestoreRepository.kt
+    suspend fun cancelAlert (alertId: String) : Result<Unit>{
+        return try {
+            db.collection("alerts").document(alertId)
+                .update(
+                    mapOf(
+                        "cancelled" to true,
+                        "solved" to true
+                    )
+                ).await()
+            Result.success(Unit)
+        } catch (e: Exception){
+            Result.failure(e)
+        }
+    }
+
     fun listenForAlerts(protectedIds: List<String>, onAlertsReceived: (List<Alert>) -> Unit) {
         if (protectedIds.isEmpty()) return
 
