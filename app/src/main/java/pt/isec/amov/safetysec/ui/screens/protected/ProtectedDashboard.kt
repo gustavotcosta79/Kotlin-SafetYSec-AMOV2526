@@ -255,7 +255,7 @@ fun ProtectedDashboard(
         }
 
         // =========================================================
-        // 2. DIÁLOGO "MEUS MONITORES" (NOVO)
+        // 2. DIÁLOGO "MEUS MONITORES"
         // =========================================================
         if (showMonitorsDialog) {
             AlertDialog(

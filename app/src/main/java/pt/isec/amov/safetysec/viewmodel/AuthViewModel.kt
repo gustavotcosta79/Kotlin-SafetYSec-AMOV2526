@@ -301,7 +301,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    fun removeAssociation (protectedId : String){
+    fun disassociateProtected (protectedId : String){
         val monitor = currentUser ?: return
         isLoading = true
 
@@ -355,8 +355,8 @@ class AuthViewModel : ViewModel() {
                 // Atualiza a lista visualmente
                 associatedMonitors = associatedMonitors.filter { it.id != monitorId }
 
-                // Atualiza o perfil do user atual (para limpar os IDs internos)
-                fetchCurrentUser()
+                val updatedUser = authRepository.getUserProfile(protectedUser.id)
+                currentUser = updatedUser
             } else {
                 errorMessage = "Erro ao remover monitor"
             }

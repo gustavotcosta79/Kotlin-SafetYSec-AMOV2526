@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
@@ -155,7 +154,7 @@ fun MonitorDashboard(
                 Button(
                     onClick = {
                         // Chama o ViewModel para apagar
-                        authViewModel.removeAssociation(userParaRemover!!.id)
+                        authViewModel.disassociateProtected(userParaRemover!!.id)
                         userParaRemover = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -257,7 +256,6 @@ fun MonitorDashboard(
                             )
                         },
                         trailingContent = {
-                            // AQUI ESTÁ A MUDANÇA: Uma Row com 2 Botões
                             Row {
                                 // 1. Botão Mapa
                                 IconButton(onClick = {
