@@ -275,4 +275,26 @@ class FirestoreRepository {
             Result.failure(e)
         }
     }
+
+    // Obter histórico global de VÁRIOS protegidos (para o Monitor)
+    suspend fun getAlertsForMonitor(protectedIds: List<String>): Result<List<Alert>> {
+        // Se o monitor não tiver ninguém, não vale a pena ir à base de dados
+        if (protectedIds.isEmpty()) return Result.success(emptyList())
+
+        return try {
+            // NOTA: O Firestore tem um limite de 10 itens no "whereIn".
+            // Para este projeto escolar serve, mas numa app real terias de dividir a lista.
+            val snapshot = db.collection("alerts")
+                .whereIn("protectedId", protectedIds) // Traz-me alertas onde o ID seja UM DESTES
+                .get()
+                .await()
+
+            // Convertemos e ordenamos por data (mais recente primeiro)
+            val alerts = snapshot.toObjects(Alert::class.java).sortedByDescending { it.date }
+
+            Result.success(alerts)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

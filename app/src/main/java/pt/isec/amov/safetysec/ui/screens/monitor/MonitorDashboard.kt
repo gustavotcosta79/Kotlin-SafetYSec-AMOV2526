@@ -22,6 +22,8 @@ import pt.isec.amov.safetysec.data.model.RuleType
 import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 import pt.isec.amov.safetysec.viewmodel.MonitorViewModel
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun MonitorDashboard(
@@ -44,6 +46,8 @@ fun MonitorDashboard(
     var showAddRuleDialog by remember { mutableStateOf(false) }         // Abre o form de criar
     var ruleToEdit by remember { mutableStateOf<Rule?>(null) }          // Abre o form de editar
 
+    var showHistoryDialog by remember { mutableStateOf(false) }
+
     // Quando selecionamos um utilizador para gerir regras, carregamos as regras dele
     LaunchedEffect(userParaGerirRegras) {
         if (userParaGerirRegras != null) {
@@ -52,7 +56,68 @@ fun MonitorDashboard(
     }
 
     // =====================================================================
-    // 1. DIÁLOGO PRINCIPAL: LISTA DE REGRAS DO UTILIZADOR
+    // DIÁLOGO: HISTÓRICO GLOBAL DE ALERTAS (NOVO)
+    // =====================================================================
+    if (showHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showHistoryDialog = false },
+            title = { Text("Histórico Recente (Todos)") },
+            text = {
+                if (monitorViewModel.monitorAlertHistory.isEmpty()) {
+                    Text("Não existem alertas registados nos seus protegidos.")
+                } else {
+                    LazyColumn {
+                        items(monitorViewModel.monitorAlertHistory) { alert ->
+                            val dateFormat = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
+                            val dataFormatada = try { dateFormat.format(alert.date) } catch (e: Exception) { "-" }
+
+                            // Tentar descobrir o NOME do protegido através do ID ou Email
+                            val nomeProtegido = authViewModel.monitoredUsers.find { it.id == alert.protectedId }?.name
+                                ?: alert.userEmail // Fallback para email se não encontrar nome
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                ListItem(
+                                    headlineContent = {
+                                        // AQUI MOSTRAMOS O NOME DA PESSOA
+                                        Text("$nomeProtegido: ${alert.type.name}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                    },
+                                    supportingContent = {
+                                        Column {
+                                            Text("Data: $dataFormatada")
+                                            val estado = when {
+                                                alert.cancelled -> "Cancelado"
+                                                alert.solved -> "Resolvido"
+                                                else -> "ATIVO"
+                                            }
+                                            val cor = if(!alert.cancelled && !alert.solved) Color.Red else Color.Gray
+                                            Text(estado, color = cor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                        }
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            if (alert.type == RuleType.BOTAO_PANICO) Icons.Default.Warning else Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = if (!alert.cancelled && !alert.solved) Color.Red else MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                )
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHistoryDialog = false }) { Text("Fechar") }
+            }
+        )
+    }
+
+    // =====================================================================
+    // DIÁLOGO PRINCIPAL: LISTA DE REGRAS DO UTILIZADOR
     // =====================================================================
     if (userParaGerirRegras != null && !showAddRuleDialog && ruleToEdit == null) {
         val targetUser = userParaGerirRegras!!
@@ -138,7 +203,7 @@ fun MonitorDashboard(
     }
 
     // =====================================================================
-    // 2. DIÁLOGO: CRIAR NOVA REGRA
+    // DIÁLOGO: CRIAR NOVA REGRA
     // =====================================================================
     if (showAddRuleDialog) {
         AlertDialog(
@@ -195,7 +260,7 @@ fun MonitorDashboard(
     }
 
     // =====================================================================
-    // 3. DIÁLOGO: EDITAR REGRA EXISTENTE
+    // DIÁLOGO: EDITAR REGRA EXISTENTE
     // =====================================================================
     if (ruleToEdit != null) {
         AlertDialog(
@@ -280,6 +345,14 @@ fun MonitorDashboard(
         ) {
             Text("Painel do Monitor", style = MaterialTheme.typography.headlineSmall)
             Row {
+
+                IconButton(onClick = {
+                    // Passamos a lista de users que o monitor tem associados para buscar os alertas deles
+                    monitorViewModel.fetchMonitorAlertHistory(authViewModel.monitoredUsers)
+                    showHistoryDialog = true
+                }) {
+                    Icon(Icons.Default.History, "Histórico Recente")
+                }
                 IconButton(onClick = onNavigateToProfile) {
                     Icon(Icons.Default.AccountCircle, "Perfil")
                 }

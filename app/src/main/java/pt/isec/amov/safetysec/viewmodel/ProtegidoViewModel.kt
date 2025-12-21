@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -19,7 +18,6 @@ import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
 import pt.isec.amov.safetysec.managers.LocationManager
 import java.util.Date
-import kotlin.math.log10
 
 class ProtegidoViewModel (
     private val locationManager: LocationManager,
@@ -38,6 +36,7 @@ class ProtegidoViewModel (
     var countdownValue by mutableStateOf(10)
     private var countdownJob: Job? = null
 
+    var currentAlertType by mutableStateOf(RuleType.UNKNOWN) //Para saber se é Pânico, Velocidade, etc.
     var alertHistory by mutableStateOf<List<Alert>>(emptyList())
         private set
 
@@ -84,25 +83,8 @@ class ProtegidoViewModel (
     }
 
     fun startPanicProcess(user: User) {
-        if (activeAlertId != null) return // Já existe um alerta real, ignora
-
-        // Prepara a contagem
-        isCountingDown = true
-        countdownValue = 10
-        errorMessage = null
-        successMessage = null
-
-        // Inicia a corrotina do timer
-        countdownJob = viewModelScope.launch {
-            while (countdownValue > 0) {
-                delay(1000L) // Espera 1 segundo
-                countdownValue--
-            }
-
-            // SE CHEGAR AQUI, O TEMPO ACABOU! ENVIAR ALERTA REAL!
-            isCountingDown = false
-            sendPanicAlert(user)
-        }
+        if (activeAlertId != null) return
+        triggerAlertProcess(RuleType.BOTAO_PANICO,user)
     }
 
     /**
@@ -156,9 +138,25 @@ class ProtegidoViewModel (
      * Ela deve iniciar o timer de 10s antes de enviar o alerta final.
      */
     private fun triggerAlertProcess(type: RuleType, user: User) {
-        // Aqui o teu colega chamará a UI de "Contagem Decrescente"
-        // Se após 10s não for cancelado, chama o firestoreRepository.createAlert(...)
-        Log.d("SafetYSec", "ALERTA DETETADO: $type. A iniciar contagem de 10s.")
+        if (activeAlertId != null || isCountingDown) return
+
+        // 2. Configura a UI para mostrar a contagem
+        currentAlertType = type
+        isCountingDown = true
+        countdownValue = 10
+        errorMessage = null
+        successMessage = null
+
+        // Inicia o Timer (Igual ao botão de pânico)
+        countdownJob = viewModelScope.launch {
+            while (countdownValue > 0) {
+                delay(1000L)
+                countdownValue--
+            }
+            // O tempo acabou, Enviamos para a Base de Dados!
+            isCountingDown = false
+            sendAlert(user, type) // Chama a função que cria o alerta no Firestore
+        }
     }
 
     override fun onCleared() {
@@ -167,13 +165,13 @@ class ProtegidoViewModel (
     }
 
 
-    fun sendPanicAlert (user : User){
+    fun sendAlert (user : User,type: RuleType){
         isLoading = true
         errorMessage = null
         successMessage = null
 
         viewModelScope.launch {
-            var location = locationManager.getCurrentLocation()
+            val location = locationManager.getCurrentLocation()
 
             if (location == null){
                 errorMessage = "Não foi possível obter a localização (gps desligado ou erro)."
@@ -183,7 +181,7 @@ class ProtegidoViewModel (
 
             val alert = Alert(
                 id = "",
-                type = RuleType.BOTAO_PANICO,
+                type = type,
                 userEmail = user.email,
                 protectedId = user.id,
                 date = Date(),

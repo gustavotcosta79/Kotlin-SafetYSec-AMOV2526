@@ -7,8 +7,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import pt.isec.amov.safetysec.data.model.Alert
 import pt.isec.amov.safetysec.data.model.Rule
 import pt.isec.amov.safetysec.data.model.RuleType
+import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
 
 class MonitorViewModel(
@@ -24,6 +26,27 @@ class MonitorViewModel(
 
     var currentRules by mutableStateOf<List<Rule>>(emptyList())
         private set
+
+    var monitorAlertHistory by mutableStateOf<List<Alert>>(emptyList())
+
+    fun fetchMonitorAlertHistory(monitoredUsers: List<User>) {
+        // Extraímos apenas os IDs da lista de objetos User
+        val ids = monitoredUsers.map { it.id }
+
+        if (ids.isEmpty()) {
+            monitorAlertHistory = emptyList()
+            return
+        }
+
+        isLoading = true
+        viewModelScope.launch {
+            val result = repository.getAlertsForMonitor(ids)
+            if (result.isSuccess) {
+                monitorAlertHistory = result.getOrNull() ?: emptyList()
+            }
+            isLoading = false
+        }
+    }
 
     fun fetchRulesForProtected(protectedId: String) {
         isLoading = true
