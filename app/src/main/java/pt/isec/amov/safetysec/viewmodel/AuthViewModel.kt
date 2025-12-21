@@ -317,7 +317,7 @@ class AuthViewModel : ViewModel() {
                 val updateUser = authRepository.getUserProfile(monitor.id)
                 currentUser = updateUser
             }else {
-                errorMessage = "Erro ao desassociar."
+                errorMessage = "Erro ao desassociar o protegido."
             }
             isLoading = false
         }
@@ -358,7 +358,7 @@ class AuthViewModel : ViewModel() {
                 val updatedUser = authRepository.getUserProfile(protectedUser.id)
                 currentUser = updatedUser
             } else {
-                errorMessage = "Erro ao remover monitor"
+                errorMessage = "Erro ao desassociar o monitor"
             }
             isLoading = false
         }

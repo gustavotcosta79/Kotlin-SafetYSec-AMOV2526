@@ -38,10 +38,22 @@ class ProtegidoViewModel (
     var countdownValue by mutableStateOf(10)
     private var countdownJob: Job? = null
 
+    var alertHistory by mutableStateOf<List<Alert>>(emptyList())
+        private set
+
     // --- NOVA LISTA DE REGRAS ---
     var rules by mutableStateOf<List<Rule>>(emptyList())
         private set
 
+
+    fun fetchAlertHistory(userId: String) {
+        viewModelScope.launch {
+            val result = firestoreRepository.getAlertHistory(userId)
+            if (result.isSuccess) {
+                alertHistory = result.getOrNull() ?: emptyList()
+            }
+        }
+    }
 
     // Inicia a escuta das regras (chamado ao entrar no ecrã)
     fun startObservingRules(userId: String) {

@@ -211,8 +211,20 @@ class FirestoreRepository {
 
     suspend fun removeAssociation (monitorId: String, protectedId: String) : Result<Unit>{
         return try {
+
+            val rulesSnapshot = db.collection("rules")
+                .whereEqualTo("monitorId", monitorId)
+                .whereEqualTo("protectedId", protectedId)
+                .get()
+                .await()
+
             //usamos batch (lote) para garantir que o id do monitor e do protegido são apagados ao msm tempo
             val batch = db.batch()
+
+            for (ruleDoc in rulesSnapshot.documents) {
+                batch.delete(ruleDoc.reference)
+            }
+
             val monitorRef = db.collection("users").document(monitorId)
             val protectedRef = db.collection("users").document(protectedId)
 
@@ -225,6 +237,41 @@ class FirestoreRepository {
             batch.commit().await()
             Result.success(Unit)
         } catch (e : Exception){
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateRule (ruleId : String, updates: Map<String, Any>): Result <Unit> {
+        return try {
+            db.collection("rules").document(ruleId).update(updates).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteRule (ruleId : String): Result <Unit> {
+        return try {
+            db.collection("rules").document(ruleId).delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Obter histórico de alertas de um protegido
+    suspend fun getAlertHistory(protectedId: String): Result<List<Alert>> {
+        return try {
+            val snapshot = db.collection("alerts")
+                .whereEqualTo("protectedId", protectedId)
+                .get()
+                .await()
+
+            // Convertemos para objetos e ordenamos por data (do mais recente para o mais antigo)
+            val alerts = snapshot.toObjects(Alert::class.java).sortedByDescending { it.date }
+
+            Result.success(alerts)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

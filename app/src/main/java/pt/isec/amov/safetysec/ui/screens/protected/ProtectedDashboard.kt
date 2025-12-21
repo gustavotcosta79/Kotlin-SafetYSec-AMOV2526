@@ -13,8 +13,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -37,6 +40,8 @@ import pt.isec.amov.safetysec.managers.LocationManager
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModel
 import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModelFactory
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun ProtectedDashboard(
@@ -56,7 +61,8 @@ fun ProtectedDashboard(
 
     // --- ESTADOS DA UI ---
     var showCancelDialog by remember { mutableStateOf(false) } // Cancelar Pânico
-    var showMonitorsDialog by remember { mutableStateOf(false) } // Gerir Monitores (NOVO)
+    var showMonitorsDialog by remember { mutableStateOf(false) } // Gerir Monitores
+    var showHistoryDialog by remember { mutableStateOf(false) } // Histórico de Alertas (NOVO)
     var pinInput by remember { mutableStateOf("") }
 
     // Estado para saber qual monitor remover (para confirmação)
@@ -109,12 +115,22 @@ fun ProtectedDashboard(
                     Icon(Icons.Default.AccountCircle, "Perfil")
                 }
 
-                // NOVO: Botão Gerir Monitores
+                // Botão Gerir Monitores
                 IconButton(onClick = {
                     authViewModel.fetchAssociatedMonitors() // Garante dados frescos
                     showMonitorsDialog = true
                 }) {
                     Icon(Icons.Default.Group, "Monitores")
+                }
+
+                // NOVO: Botão Histórico
+                IconButton(onClick = {
+                    if (user != null) {
+                        protegidoViewModel.fetchAlertHistory(user.id) // Carrega dados
+                        showHistoryDialog = true // Abre janela
+                    }
+                }) {
+                    Icon(Icons.Default.History, "Histórico")
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -293,8 +309,8 @@ fun ProtectedDashboard(
         if (monitorParaRemover != null) {
             AlertDialog(
                 onDismissRequest = { monitorParaRemover = null },
-                title = { Text("Remover Monitor?") },
-                text = { Text("Tem a certeza que deseja deixar de partilhar a sua segurança com ${monitorParaRemover?.name}?") },
+                title = { Text("Remover associação?") },
+                text = { Text("Tem a certeza que deseja se desassociar de ${monitorParaRemover?.name}?") },
                 confirmButton = {
                     Button(
                         onClick = {
@@ -303,7 +319,7 @@ fun ProtectedDashboard(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("Remover")
+                        Text("Desassociar")
                     }
                 },
                 dismissButton = {
@@ -313,7 +329,72 @@ fun ProtectedDashboard(
         }
 
         // =========================================================
-        // 4. OVERLAY MANUAL (PIN PARA CANCELAR PÂNICO)
+        // 4. DIÁLOGO DE HISTÓRICO (NOVO)
+        // =========================================================
+        if (showHistoryDialog) {
+            AlertDialog(
+                onDismissRequest = { showHistoryDialog = false },
+                title = { Text("Histórico de Alertas") },
+                text = {
+                    if (protegidoViewModel.alertHistory.isEmpty()) {
+                        Text("Ainda não existem alertas registados.")
+                    } else {
+                        LazyColumn {
+                            items(protegidoViewModel.alertHistory) { alert ->
+                                val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                                val dataFormatada = try { dateFormat.format(alert.date) } catch (e: Exception) { "Data desconhecida" }
+
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                ) {
+                                    ListItem(
+                                        headlineContent = {
+                                            Text(alert.type.name, fontWeight = FontWeight.Bold)
+                                        },
+                                        supportingContent = {
+                                            Column {
+                                                Text("Data: $dataFormatada")
+                                                // Lógica para estado do alerta
+                                                val estado = when {
+                                                    alert.cancelled -> "Cancelado pelo utilizador"
+                                                    alert.solved -> "Resolvido pelo Monitor"
+                                                    else -> "Ativo / Pendente"
+                                                }
+                                                val corEstado = when {
+                                                    alert.cancelled -> Color.Gray
+                                                    alert.solved -> Color(0xFF2E7D32) // Verde
+                                                    else -> Color.Red
+                                                }
+                                                Text(estado, color = corEstado, style = MaterialTheme.typography.bodySmall)
+                                            }
+                                        },
+                                        leadingContent = {
+                                            // Ícone consoante o estado
+                                            val icon = when {
+                                                alert.cancelled -> Icons.Default.Close
+                                                alert.solved -> Icons.Default.CheckCircle
+                                                else -> Icons.Default.Warning
+                                            }
+                                            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                    )
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showHistoryDialog = false }) { Text("Fechar") }
+                }
+            )
+        }
+
+        // =========================================================
+        // 5. OVERLAY MANUAL (PIN PARA CANCELAR PÂNICO)
         // =========================================================
         if (showCancelDialog) {
             Box(

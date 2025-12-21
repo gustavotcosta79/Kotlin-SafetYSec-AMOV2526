@@ -5,10 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.maps.model.LatLng
+import pt.isec.amov.safetysec.data.model.Rule
 import pt.isec.amov.safetysec.data.model.RuleType
 import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
@@ -39,48 +37,116 @@ fun MonitorDashboard(
 
     // --- ESTADOS LOCAIS ---
     var userParaMapa by remember { mutableStateOf<Pair<User, LatLng?>?>(null) }
-    var userParaRegra by remember { mutableStateOf<User?>(null) }
-
-    // NOVO: Estado para saber quem vamos apagar (se null, o diálogo fecha)
     var userParaRemover by remember { mutableStateOf<User?>(null) }
 
+    // --- ESTADOS DE GESTÃO DE REGRAS ---
+    var userParaGerirRegras by remember { mutableStateOf<User?>(null) } // Abre a lista de regras
+    var showAddRuleDialog by remember { mutableStateOf(false) }         // Abre o form de criar
+    var ruleToEdit by remember { mutableStateOf<Rule?>(null) }          // Abre o form de editar
+
+    // Quando selecionamos um utilizador para gerir regras, carregamos as regras dele
+    LaunchedEffect(userParaGerirRegras) {
+        if (userParaGerirRegras != null) {
+            monitorViewModel.fetchRulesForProtected(userParaGerirRegras!!.id)
+        }
+    }
+
     // =====================================================================
-    // DIÁLOGO DO MAPA
+    // 1. DIÁLOGO PRINCIPAL: LISTA DE REGRAS DO UTILIZADOR
     // =====================================================================
-    if (userParaMapa != null && userParaMapa?.second != null) {
+    if (userParaGerirRegras != null && !showAddRuleDialog && ruleToEdit == null) {
+        val targetUser = userParaGerirRegras!!
+
         AlertDialog(
-            onDismissRequest = { userParaMapa = null },
+            onDismissRequest = { userParaGerirRegras = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            confirmButton = {
-                Button(onClick = { userParaMapa = null }) { Text("Fechar") }
+            modifier = Modifier.fillMaxWidth(0.95f).fillMaxHeight(0.8f),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Settings, null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Regras: ${targetUser.name}")
+                }
             },
             text = {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    MapScreen(
-                        latitude = userParaMapa!!.second!!.latitude,
-                        longitude = userParaMapa!!.second!!.longitude,
-                        title = userParaMapa!!.first.name
-                    )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Botão Nova Regra
+                    Button(
+                        onClick = { showAddRuleDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Nova Regra")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (monitorViewModel.currentRules.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Sem regras definidas.", color = Color.Gray)
+                        }
+                    } else {
+                        LazyColumn {
+                            items(monitorViewModel.currentRules) { rule ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(rule.type.name, fontWeight = FontWeight.Bold)
+                                            // Ícones de Ação (Editar / Apagar)
+                                            Row {
+                                                IconButton(onClick = {
+                                                    // Carrega dados para edição
+                                                    monitorViewModel.ruleValueInput = rule.valueDouble?.toString() ?: ""
+                                                    monitorViewModel.ruleDescription = rule.description
+                                                    ruleToEdit = rule
+                                                }) {
+                                                    Icon(Icons.Default.Edit, "Editar", tint = MaterialTheme.colorScheme.primary)
+                                                }
+                                                IconButton(onClick = { monitorViewModel.deleteRule(rule.id, targetUser.id) }) {
+                                                    Icon(Icons.Default.Delete, "Apagar", tint = MaterialTheme.colorScheme.error)
+                                                }
+                                            }
+                                        }
+                                        Text("Valor: ${rule.valueDouble ?: "-"}", style = MaterialTheme.typography.bodyMedium)
+                                        Text(rule.description, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
+                                        // Estado da Regra
+                                        Text(
+                                            if(rule.isActive) "Estado: ATIVA" else "Estado: INATIVA (A aguardar protegido)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if(rule.isActive) Color(0xFF2E7D32) else Color(0xFFEF6C00)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
+            },
+            confirmButton = {
+                TextButton(onClick = { userParaGerirRegras = null }) { Text("Fechar") }
             }
         )
     }
 
     // =====================================================================
-    // DIÁLOGO PARA CRIAR REGRA
+    // 2. DIÁLOGO: CRIAR NOVA REGRA
     // =====================================================================
-    if (userParaRegra != null) {
-        val targetUser = userParaRegra!!
-
+    if (showAddRuleDialog) {
         AlertDialog(
-            onDismissRequest = { userParaRegra = null },
-            title = { Text("Propor Regra a ${targetUser.name}") },
+            onDismissRequest = { showAddRuleDialog = false },
+            title = { Text("Nova Regra") },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("Escolha o tipo de regra:", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-
+                Column {
+                    Text("Tipo:", style = MaterialTheme.typography.labelMedium)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.CONTROLO_VELOCIDADE,
@@ -98,73 +164,107 @@ fun MonitorDashboard(
                             label = { Text("Area") }
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = monitorViewModel.ruleValueInput,
                         onValueChange = { monitorViewModel.ruleValueInput = it },
                         label = { Text("Valor (Km/h, Minutos ou Raio)") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
-
                     Spacer(modifier = Modifier.height(8.dp))
-
                     OutlinedTextField(
                         value = monitorViewModel.ruleDescription,
                         onValueChange = { monitorViewModel.ruleDescription = it },
-                        label = { Text("Descrição curta") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        label = { Text("Descrição") }
                     )
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        val monitorId = authViewModel.currentUser?.id ?: ""
-                        monitorViewModel.submitRule(
-                            monitorId = monitorId,
-                            protectedId = targetUser.id,
-                            onFinished = { userParaRegra = null }
-                        )
-                    },
-                    enabled = !monitorViewModel.isLoading
-                ) {
-                    Text(if (monitorViewModel.isLoading) "A guardar..." else "Propor Regra")
-                }
+                Button(onClick = {
+                    monitorViewModel.submitRule(
+                        monitorId = authViewModel.currentUser?.id ?: "",
+                        protectedId = userParaGerirRegras!!.id,
+                        onFinished = { showAddRuleDialog = false }
+                    )
+                }) { Text("Criar") }
             },
             dismissButton = {
-                TextButton(onClick = { userParaRegra = null }) { Text("Cancelar") }
+                TextButton(onClick = { showAddRuleDialog = false }) { Text("Cancelar") }
             }
         )
     }
 
     // =====================================================================
-    //       DIÁLOGO DE CONFIRMAÇÃO DE REMOÇÃO
+    // 3. DIÁLOGO: EDITAR REGRA EXISTENTE
     // =====================================================================
+    if (ruleToEdit != null) {
+        AlertDialog(
+            onDismissRequest = { ruleToEdit = null },
+            title = { Text("Editar Regra") },
+            text = {
+                Column {
+                    Text("Tipo: ${ruleToEdit!!.type.name}", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = monitorViewModel.ruleValueInput,
+                        onValueChange = { monitorViewModel.ruleValueInput = it },
+                        label = { Text("Novo Valor") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = monitorViewModel.ruleDescription,
+                        onValueChange = { monitorViewModel.ruleDescription = it },
+                        label = { Text("Nova Descrição") }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    monitorViewModel.updateRule(
+                        ruleId = ruleToEdit!!.id,
+                        newValue = monitorViewModel.ruleValueInput,
+                        newDesc = monitorViewModel.ruleDescription,
+                        protectedId = userParaGerirRegras!!.id,
+                        onFinished = { ruleToEdit = null }
+                    )
+                }) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { ruleToEdit = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // =====================================================================
+    // DIÁLOGOS DE MAPA E REMOÇÃO
+    // =====================================================================
+    if (userParaMapa != null && userParaMapa?.second != null) {
+        AlertDialog(
+            onDismissRequest = { userParaMapa = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            confirmButton = { Button(onClick = { userParaMapa = null }) { Text("Fechar") } },
+            text = { Box(modifier = Modifier.fillMaxSize()) { MapScreen(userParaMapa!!.second!!.latitude, userParaMapa!!.second!!.longitude, userParaMapa!!.first.name) } }
+        )
+    }
+
     if (userParaRemover != null) {
         AlertDialog(
             onDismissRequest = { userParaRemover = null },
             title = { Text("Remover Associação") },
-            text = { Text("Tem a certeza que deseja deixar de monitorizar ${userParaRemover?.name}? Esta ação não pode ser desfeita.") },
+            text = { Text("Tem a certeza que deseja desassociar ${userParaRemover?.name}? Esta ação não pode ser desfeita.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        // Chama o ViewModel para apagar
+                        // Nota: Usa removeAssociation conforme definido no AuthViewModel anterior
                         authViewModel.disassociateProtected(userParaRemover!!.id)
                         userParaRemover = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Remover")
-                }
+                ) { Text("Desassociar") }
             },
-            dismissButton = {
-                TextButton(onClick = { userParaRemover = null }) { Text("Cancelar") }
-            }
+            dismissButton = { TextButton(onClick = { userParaRemover = null }) { Text("Cancelar") } }
         )
     }
 
@@ -172,7 +272,7 @@ fun MonitorDashboard(
     // CONTEÚDO PRINCIPAL
     // =====================================================================
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        // --- CABEÇALHO ---
+        // CABEÇALHO
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -191,7 +291,7 @@ fun MonitorDashboard(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. SECÇÃO DE ADICIONAR PROTEGIDO
+        // ADICIONAR PROTEGIDO
         Card(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -217,13 +317,8 @@ fun MonitorDashboard(
             }
         }
 
-        // 2. LISTA DE UTILIZADORES
-        Text(
-            "Meus Protegidos",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
+        // LISTA PROTEGIDOS
+        Text("Meus Protegidos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(authViewModel.monitoredUsers) { protegido ->
                 val alertaVinculado = authViewModel.activeAlerts.find { it.userEmail == protegido.email }
@@ -235,8 +330,8 @@ fun MonitorDashboard(
                         containerColor = if (temAlerta) MaterialTheme.colorScheme.errorContainer
                         else MaterialTheme.colorScheme.surface
                     ),
-                    // Clique no cartão abre menu de regras (Opcional, mas útil)
-                    onClick = { userParaRegra = protegido }
+                    // MUDANÇA IMPORTANTE: Clicar no cartão agora abre a lista de regras
+                    onClick = { userParaGerirRegras = protegido }
                 ) {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -265,20 +360,12 @@ fun MonitorDashboard(
                                         userParaMapa = Pair(protegido, LatLng(lat, lon))
                                     }
                                 }) {
-                                    Icon(
-                                        Icons.Default.LocationOn,
-                                        contentDescription = "Mapa",
-                                        tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.outline
-                                    )
+                                    Icon(Icons.Default.LocationOn, "Mapa", tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.outline)
                                 }
 
                                 // 2. Botão Remover (Lixo)
                                 IconButton(onClick = { userParaRemover = protegido }) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Remover",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
+                                    Icon(Icons.Default.Delete, "Remover", tint = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }

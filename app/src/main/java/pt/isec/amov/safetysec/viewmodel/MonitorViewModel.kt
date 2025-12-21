@@ -22,6 +22,45 @@ class MonitorViewModel(
     var ruleValueInput by mutableStateOf("") // Ex: "120" para velocidade
     var ruleDescription by mutableStateOf("")
 
+    var currentRules by mutableStateOf<List<Rule>>(emptyList())
+        private set
+
+    fun fetchRulesForProtected(protectedId: String) {
+        isLoading = true
+        viewModelScope.launch {
+            val result = repository.getRulesForUser(protectedId)
+            if (result.isSuccess) {
+                currentRules = result.getOrNull() ?: emptyList()
+            }
+            isLoading = false
+        }
+    }
+
+    // Apagar regra
+    fun deleteRule(ruleId: String, protectedId: String) {
+        viewModelScope.launch {
+            repository.deleteRule(ruleId)
+            fetchRulesForProtected(protectedId) // Atualiza a lista
+        }
+    }
+
+    // Editar regra
+    fun updateRule(ruleId: String, newValue: String, newDesc: String, protectedId: String, onFinished: () -> Unit) {
+        val valueDouble = newValue.toDoubleOrNull()
+        val updates = mapOf(
+            "valueDouble" to (valueDouble ?: 0.0),
+            "description" to newDesc
+        )
+
+        viewModelScope.launch {
+            repository.updateRule(ruleId, updates)
+            fetchRulesForProtected(protectedId) // Atualiza a lista
+            onFinished()
+        }
+    }
+
+
+
     fun submitRule(monitorId: String, protectedId: String, onFinished: () -> Unit) {
         isLoading = true
 
@@ -40,10 +79,12 @@ class MonitorViewModel(
             // Agora capturamos o resultado
             val result = repository.proposeRule(newRule)
 
-            isLoading = false
 
             if (result.isSuccess) {
-                Log.d("SafetySec", "SUCESSO: Regra gravada no Firestore! ID: ${newRule.type}")
+                //vamos buscar as novas regras à bd para mostrar logo na lista
+                val updateRules = repository.getRulesForUser(protectedId)
+
+                currentRules = updateRules.getOrNull() ?: emptyList()
 
                 // Só limpamos e fechamos se tiver corrido bem
                 ruleValueInput = ""
@@ -53,9 +94,8 @@ class MonitorViewModel(
                 val erro = result.exceptionOrNull()?.message
                 Log.e("SafetySec", "ERRO: Falha ao gravar regra: $erro")
             }
+            isLoading = false
+
         }
     }
-
-
-
 }

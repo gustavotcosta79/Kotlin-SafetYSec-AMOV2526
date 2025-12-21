@@ -5,8 +5,7 @@ import android.content.Context
 import android.location.Location
 import android.os.Looper
 import com.google.android.gms.location.*
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.tasks.CancellationTokenSource // IMPORTANTE
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -22,40 +21,44 @@ data class LocationData (
 class LocationManager(private val context: Context) {
     private val client: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
 
-    //funcao p obter a localização para o botão de pânico
-    //devolve null se não conseguir encontrar ou se o gps estiver desligado/sem permissão
+    // --- MUDANÇA AQUI ---
+    // Em vez de pedir a "lastLocation" (memória), pedimos a "CurrentLocation" (fresca)
     @SuppressLint("MissingPermission")
     suspend fun getCurrentLocation(): Location? {
         return try {
-            val location = client.lastLocation.await() //tenta obter a ultima localização conhecida
+            // Priority.PRIORITY_HIGH_ACCURACY exige GPS
+            // CancellationTokenSource é necessário para cancelar se demorar muito (embora aqui não estejamos a usar timeout manual)
+            val priority = Priority.PRIORITY_HIGH_ACCURACY
+            val cancellationTokenSource = CancellationTokenSource()
+
+            val location = client.getCurrentLocation(
+                priority,
+                cancellationTokenSource.token
+            ).await()
+
             location
-        }catch (e: Exception){
+        } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
+    // --------------------
 
-    //funcao p obter a loc em tempo real
-    //devolve um fluxo continuo de dados
-     @SuppressLint("MissingPermission")
+    // funcao p obter a loc em tempo real (Mantém-se igual)
+    @SuppressLint("MissingPermission")
     fun getLocationUpdates(intervalMs: Long = 5000L): Flow<LocationData>{
         return callbackFlow {
-            //cfg do pedido
             val request = LocationRequest.Builder (
                 Priority.PRIORITY_HIGH_ACCURACY,
                 intervalMs
             ).apply {
-                setMinUpdateDistanceMeters(5f) //só enviamos notificação se ele se mover 5metros
+                setMinUpdateDistanceMeters(5f)
             }.build()
 
             val locationCallback = object : LocationCallback() {
                 override fun onLocationResult(result: LocationResult) {
-
                     result.lastLocation?.let { location ->
-                        // O Android dá a velocidade em m/s, convertemos para km/h
                         val speed = if (location.hasSpeed()) location.speed * 3.6 else 0.0
-
-                        // Envia os dados
                         trySend(
                             LocationData(
                                 latitude = location.latitude,
@@ -68,19 +71,15 @@ class LocationManager(private val context: Context) {
                 }
             }
 
-            // Inicia a escuta
             client.requestLocationUpdates(
                 request,
                 locationCallback,
                 Looper.getMainLooper()
             )
 
-            // Quando deixarmos de ouvir (cancelar o Flow), isto limpa a memória
             awaitClose {
                 client.removeLocationUpdates(locationCallback)
             }
-
         }
     }
 }
-
