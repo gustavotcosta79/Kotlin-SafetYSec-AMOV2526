@@ -70,6 +70,18 @@ class AuthRepository {
         }
     }
 
+    suspend fun updateEmail(newEmail: String): Result<Unit> {
+        return try {
+            // O verifyBeforeUpdateEmail é mais seguro, mas para este projeto
+            // o updateEmail direto é suficiente.
+            auth.currentUser?.updateEmail(newEmail)?.await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            // Erros comuns: Email já existe, Email inválido, Re-login necessário
+            Result.failure(e)
+        }
+    }
+
     fun logout() {
         auth.signOut()
     }

@@ -2,7 +2,6 @@ package pt.isec.amov.safetysec.data.repository
 
 import androidx.compose.runtime.Updater
 import com.google.android.gms.common.api.internal.ApiExceptionMapper
-import androidx.room.util.copy
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import kotlinx.coroutines.tasks.await
@@ -65,7 +64,7 @@ class FirestoreRepository {
         }
     }
 
-    // Nova função para listar os protegidos com os nomes correctos
+    // função para listar os protegidos com os nomes correctos
     suspend fun getAssociatedUsers(uids: List<String>): Result<List<User>> {
         return try {
             if (uids.isEmpty()) return Result.success(emptyList())
@@ -210,5 +209,23 @@ class FirestoreRepository {
         }
     }
 
+    suspend fun removeAssociation (monitorId: String, protectedId: String) : Result<Unit>{
+        return try {
+            //usamos batch (lote) para garantir que o id do monitor e do protegido são apagados ao msm tempo
+            val batch = db.batch()
+            val monitorRef = db.collection("users").document(monitorId)
+            val protectedRef = db.collection("users").document(protectedId)
 
+            //remover o id do protegido da lista do monitor
+            batch.update(monitorRef,"associatedProtegidoIds", FieldValue.arrayRemove(protectedId))
+
+            //remover o id do monitor da lista do protegido
+            batch.update(protectedRef,"associatedMonitorIds", FieldValue.arrayRemove(monitorId))
+
+            batch.commit().await()
+            Result.success(Unit)
+        } catch (e : Exception){
+            Result.failure(e)
+        }
+    }
 }

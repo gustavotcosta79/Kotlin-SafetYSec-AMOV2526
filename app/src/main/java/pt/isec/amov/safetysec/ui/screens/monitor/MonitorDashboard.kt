@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -28,7 +29,7 @@ import pt.isec.amov.safetysec.viewmodel.MonitorViewModel
 @Composable
 fun MonitorDashboard(
     authViewModel: AuthViewModel,
-    monitorViewModel: MonitorViewModel = viewModel(), // Injetamos o novo VM aqui
+    monitorViewModel: MonitorViewModel = viewModel(),
     onLogout: () -> Unit,
     onNavigateToProfile: () -> Unit
 ) {
@@ -37,14 +38,15 @@ fun MonitorDashboard(
         authViewModel.startObservingAlerts()
     }
 
-    // --- ESTADOS PARA O MAPA ---
+    // --- ESTADOS LOCAIS ---
     var userParaMapa by remember { mutableStateOf<Pair<User, LatLng?>?>(null) }
-
-    // --- ESTADO PARA O DIÁLOGO DE REGRAS ---
     var userParaRegra by remember { mutableStateOf<User?>(null) }
 
+    // NOVO: Estado para saber quem vamos apagar (se null, o diálogo fecha)
+    var userParaRemover by remember { mutableStateOf<User?>(null) }
+
     // =====================================================================
-    // LÓGICA DO DIÁLOGO DO MAPA (O TEU CÓDIGO)
+    // DIÁLOGO DO MAPA
     // =====================================================================
     if (userParaMapa != null && userParaMapa?.second != null) {
         AlertDialog(
@@ -56,7 +58,6 @@ fun MonitorDashboard(
             },
             text = {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Chama o MapScreen que criaste (precisa de estar no projeto)
                     MapScreen(
                         latitude = userParaMapa!!.second!!.latitude,
                         longitude = userParaMapa!!.second!!.longitude,
@@ -68,7 +69,7 @@ fun MonitorDashboard(
     }
 
     // =====================================================================
-    // NOVA LÓGICA: DIÁLOGO PARA CRIAR REGRA
+    // DIÁLOGO PARA CRIAR REGRA
     // =====================================================================
     if (userParaRegra != null) {
         val targetUser = userParaRegra!!
@@ -81,7 +82,6 @@ fun MonitorDashboard(
                     Text("Escolha o tipo de regra:", style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Seleção Simples de Tipo (Podes melhorar com Dropdown)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.CONTROLO_VELOCIDADE,
@@ -102,7 +102,6 @@ fun MonitorDashboard(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Input de Valor
                     OutlinedTextField(
                         value = monitorViewModel.ruleValueInput,
                         onValueChange = { monitorViewModel.ruleValueInput = it },
@@ -114,7 +113,6 @@ fun MonitorDashboard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Input de Descrição
                     OutlinedTextField(
                         value = monitorViewModel.ruleDescription,
                         onValueChange = { monitorViewModel.ruleDescription = it },
@@ -131,7 +129,7 @@ fun MonitorDashboard(
                         monitorViewModel.submitRule(
                             monitorId = monitorId,
                             protectedId = targetUser.id,
-                            onFinished = { userParaRegra = null } // Fecha o diálogo
+                            onFinished = { userParaRegra = null }
                         )
                     },
                     enabled = !monitorViewModel.isLoading
@@ -146,33 +144,55 @@ fun MonitorDashboard(
     }
 
     // =====================================================================
+    //       DIÁLOGO DE CONFIRMAÇÃO DE REMOÇÃO
+    // =====================================================================
+    if (userParaRemover != null) {
+        AlertDialog(
+            onDismissRequest = { userParaRemover = null },
+            title = { Text("Remover Associação") },
+            text = { Text("Tem a certeza que deseja deixar de monitorizar ${userParaRemover?.name}? Esta ação não pode ser desfeita.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Chama o ViewModel para apagar
+                        authViewModel.removeAssociation(userParaRemover!!.id)
+                        userParaRemover = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Remover")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { userParaRemover = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // =====================================================================
     // CONTEÚDO PRINCIPAL
     // =====================================================================
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        // --- CABEÇALHO COM LOGOUT ---
+        // --- CABEÇALHO ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Text("Painel do Monitor", style = MaterialTheme.typography.headlineSmall)
-
-            //icon p ver o perfil
-            IconButton(onClick = onNavigateToProfile) {
-                Icon(Icons.Default.AccountCircle, "Perfil")
-            }
-            //dar logout
-            TextButton(onClick = {
-                authViewModel.onLogoutClick { onLogout() }
-            }) {
-                Text("Terminar Sessão")
+            Row {
+                IconButton(onClick = onNavigateToProfile) {
+                    Icon(Icons.Default.AccountCircle, "Perfil")
+                }
+                TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) {
+                    Text("Sair")
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. SECÇÃO DE ADICIONAR PROTEGIDO (Compacta)
+        // 1. SECÇÃO DE ADICIONAR PROTEGIDO
         Card(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -190,7 +210,7 @@ fun MonitorDashboard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
-                    onClick = { authViewModel.onLinkSubmit { /* Feedback sucesso */ } },
+                    onClick = { authViewModel.onLinkSubmit { /* Sucesso */ } },
                     enabled = !authViewModel.isLoading
                 ) {
                     Text("Ligar")
@@ -207,7 +227,6 @@ fun MonitorDashboard(
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(authViewModel.monitoredUsers) { protegido ->
-                // Verifica se este protegido tem um alerta ativo
                 val alertaVinculado = authViewModel.activeAlerts.find { it.userEmail == protegido.email }
                 val temAlerta = alertaVinculado != null
 
@@ -216,7 +235,9 @@ fun MonitorDashboard(
                     colors = CardDefaults.cardColors(
                         containerColor = if (temAlerta) MaterialTheme.colorScheme.errorContainer
                         else MaterialTheme.colorScheme.surface
-                    )
+                    ),
+                    // Clique no cartão abre menu de regras (Opcional, mas útil)
+                    onClick = { userParaRegra = protegido }
                 ) {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -236,23 +257,31 @@ fun MonitorDashboard(
                             )
                         },
                         trailingContent = {
-                            // BOTÃO DE LOCALIZAÇÃO QUE ABRE O MAPA INTERNO
-                            IconButton(onClick = {
-                                // Prioridade: Localização do alerta. Alternativa: Última conhecida do user.
-                                val lat = alertaVinculado?.latitude ?: protegido.lastLatitude
-                                val lon = alertaVinculado?.longitude ?: protegido.lastLongitude
-
-                                if (lat != null && lon != null) {
-                                    userParaMapa = Pair(protegido, LatLng(lat, lon))
-                                } else {
-                                    // Podes mostrar um Toast ou erro no ViewModel aqui
+                            // AQUI ESTÁ A MUDANÇA: Uma Row com 2 Botões
+                            Row {
+                                // 1. Botão Mapa
+                                IconButton(onClick = {
+                                    val lat = alertaVinculado?.latitude ?: protegido.lastLatitude
+                                    val lon = alertaVinculado?.longitude ?: protegido.lastLongitude
+                                    if (lat != null && lon != null) {
+                                        userParaMapa = Pair(protegido, LatLng(lat, lon))
+                                    }
+                                }) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        contentDescription = "Mapa",
+                                        tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.outline
+                                    )
                                 }
-                            }) {
-                                Icon(
-                                    Icons.Default.LocationOn,
-                                    contentDescription = "Ver no Mapa",
-                                    tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.outline
-                                )
+
+                                // 2. Botão Remover (Lixo)
+                                IconButton(onClick = { userParaRemover = protegido }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Remover",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     )

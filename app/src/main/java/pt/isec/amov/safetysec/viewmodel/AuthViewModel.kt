@@ -52,6 +52,9 @@ class AuthViewModel : ViewModel() {
     var editPassword by mutableStateOf("")
     var editConfirmPassword by mutableStateOf("")
 
+    var associatedMonitors by mutableStateOf<List<User>>(emptyList())
+        private set
+
     init {
         // Se já existir sessão, carrega o perfil ao iniciar o ViewModel
         if (auth.currentUser != null) {
@@ -295,6 +298,69 @@ class AuthViewModel : ViewModel() {
                 isLoading = false
                 errorMessage = result.exceptionOrNull()?.message ?: "Erro ao associar."
             }
+        }
+    }
+
+    fun removeAssociation (protectedId : String){
+        val monitor = currentUser ?: return
+        isLoading = true
+
+        viewModelScope.launch {
+            val result = firestoreRepository.removeAssociation(monitor.id,protectedId)
+
+            if (result.isSuccess){
+                // Atualizar a lista localmente removendo o user apagado (para ser instantâneo)
+                monitoredUsers = monitoredUsers.filter { it.id != protectedId }
+
+                startObservingAlerts()
+
+                val updateUser = authRepository.getUserProfile(monitor.id)
+                currentUser = updateUser
+            }else {
+                errorMessage = "Erro ao desassociar."
+            }
+            isLoading = false
+        }
+    }
+
+    // Buscar a lista de monitores
+    fun fetchAssociatedMonitors() {
+        val user = currentUser ?: return
+        // Se não for protegido ou não tiver monitores, limpa a lista
+        if (!user.isProtected || user.associatedMonitorIds.isEmpty()) {
+            associatedMonitors = emptyList()
+            return
+        }
+
+        viewModelScope.launch {
+            // Reutilizamos a função getAssociatedUsers, pois ela serve para qualquer lista de IDs
+            val result = firestoreRepository.getAssociatedUsers(user.associatedMonitorIds)
+            if (result.isSuccess) {
+                associatedMonitors = result.getOrNull() ?: emptyList()
+            }
+        }
+    }
+
+    // Desassociar um Monitor (Ação feita pelo Protegido)
+    fun disassociateMonitor(monitorId: String) {
+        val protectedUser = currentUser ?: return
+        isLoading = true
+
+        viewModelScope.launch {
+            // A função removeAssociation pede (monitorId, protectedId).
+            // Aqui somos o protegido, por isso passamos o ID do monitor alvo e o nosso ID.
+            val result = firestoreRepository.removeAssociation(monitorId, protectedUser.id)
+
+            if (result.isSuccess) {
+                // Atualiza a lista visualmente
+                associatedMonitors = associatedMonitors.filter { it.id != monitorId }
+
+                // Atualiza o perfil do user atual (para limpar os IDs internos)
+                fetchCurrentUser()
+            } else {
+                errorMessage = "Erro ao remover monitor"
+            }
+            isLoading = false
         }
     }
 }
