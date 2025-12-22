@@ -84,41 +84,59 @@ class MonitorViewModel(
 
 
 
-    fun submitRule(monitorId: String, protectedId: String, onFinished: () -> Unit) {
+    fun submitRule(monitorId: String, targetUser: User, onFinished: () -> Unit) {
         isLoading = true
 
-        val valueDouble = ruleValueInput.toDoubleOrNull()
+        val valueInputDouble = ruleValueInput.toDoubleOrNull()
+
+        // Lógica específica para Geofencing
+        var finalLat: Double? = null
+        var finalLon: Double? = null
+        var finalRadius: Double? = null
+        var finalValue: Double? = null
+
+        if (selectedRuleType == RuleType.GEOFENCING) {
+            // Se for Geofencing, o valor inserido é o RAIO
+            finalRadius = valueInputDouble
+
+            // E o centro é a última localização do protegido
+            // Se ele nunca tiver ligado o GPS, usamos 0.0 ou null (e a regra não fica ativa logo)
+            finalLat = targetUser.lastLatitude
+            finalLon = targetUser.lastLongitude
+
+            if (finalLat == null || finalLon == null) {
+                // Opcional: Avisar erro ou assumir coordenadas de Lisboa/Coimbra por defeito
+            }
+        } else {
+            // Para Velocidade e Inatividade, usamos o valueDouble normal
+            finalValue = valueInputDouble
+        }
 
         val newRule = Rule(
             type = selectedRuleType,
             description = ruleDescription.ifBlank { "Regra de ${selectedRuleType.name}" },
-            valueDouble = valueDouble,
+            isActive = false, // Começa inativa
             monitorId = monitorId,
-            protectedId = protectedId,
-            isActive = false
+            protectedId = targetUser.id,
+
+            // Preenchemos os campos corretos consoante o tipo
+            valueDouble = finalValue,
+            radius = finalRadius,
+            latitude = finalLat,
+            longitude = finalLon
         )
 
         viewModelScope.launch {
-            // Agora capturamos o resultado
             val result = repository.proposeRule(newRule)
 
-
+            isLoading = false
             if (result.isSuccess) {
-                //vamos buscar as novas regras à bd para mostrar logo na lista
-                val updateRules = repository.getRulesForUser(protectedId)
-
-                currentRules = updateRules.getOrNull() ?: emptyList()
-
-                // Só limpamos e fechamos se tiver corrido bem
                 ruleValueInput = ""
                 ruleDescription = ""
                 onFinished()
             } else {
-                val erro = result.exceptionOrNull()?.message
-                Log.e("SafetySec", "ERRO: Falha ao gravar regra: $erro")
+                // Log de erro
             }
-            isLoading = false
-
         }
     }
 }

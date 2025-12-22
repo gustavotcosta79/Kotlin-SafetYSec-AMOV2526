@@ -118,7 +118,7 @@ class FirestoreRepository {
         if (protectedIds.isEmpty()) return
 
         db.collection("alerts")
-            .whereIn("userEmail", protectedIds) // Filtra pelos ecrãs que o monitor vigia
+            .whereIn("protectedId", protectedIds) // Filtra pelos ecrãs que o monitor vigia
             .whereEqualTo("solved", false)      // Apenas alertas ativos
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
@@ -181,18 +181,6 @@ class FirestoreRepository {
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    // Função para o Monitor propor uma nova regra
-    suspend fun addRule(rule: Rule): Result<Unit> {
-        return try {
-            val docRef = db.collection("rules").document() // Gera ID automático
-            val ruleWithId = rule.copy(id = docRef.id) // Atualiza o objeto com o ID (precisas do data class aqui!)
-
-            docRef.set(ruleWithId).await()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 
     // Função para ler as regras de um Protegido específico
     suspend fun getRulesForUser(protectedId: String): Result<List<Rule>> {

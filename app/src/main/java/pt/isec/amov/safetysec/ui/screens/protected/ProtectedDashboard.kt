@@ -37,9 +37,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
 import pt.isec.amov.safetysec.managers.LocationManager
+import pt.isec.amov.safetysec.managers.SensorManager
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModel
-import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModelFactory
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -53,8 +53,9 @@ fun ProtectedDashboard(
     val user = authViewModel.currentUser
 
     val protegidoViewModel: ProtegidoViewModel = viewModel(
-        factory = ProtegidoViewModelFactory(
+        factory = ProtegidoViewModel.ProtegidoViewModelFactory(
             LocationManager(context),
+            SensorManager(context), // <--- ADICIONAR INSTÂNCIA
             FirestoreRepository()
         )
     )
@@ -73,12 +74,16 @@ fun ProtectedDashboard(
     val isAlertSent = protegidoViewModel.activeAlertId != null
     val isInCancelMode = isCounting || isAlertSent
 
-    // --- CARREGAR DADOS INICIAIS ---
+    // --- CARREGAR DADOS INICIAIS E MONITORIZAÇÃO ---
     LaunchedEffect(user) {
         if (user != null) {
+            // 1. Carregar dados do Firestore
             protegidoViewModel.startObservingRules(user.id)
-            // Carrega também a lista de monitores ao entrar
             authViewModel.fetchAssociatedMonitors()
+
+            // 2. Ligar o Motor de Monitorização (GPS + Sensores)
+            protegidoViewModel.startAutomaticMonitoring(user) // Velocidade, Geo, Inatividade
+            protegidoViewModel.startSensorMonitoring(user)    // Queda, Acidente
         }
     }
 

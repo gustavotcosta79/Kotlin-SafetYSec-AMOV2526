@@ -1,7 +1,7 @@
 package pt.isec.amov.safetysec.viewmodel
 
-import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -17,33 +17,55 @@ import pt.isec.amov.safetysec.data.model.RuleType
 import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
 import pt.isec.amov.safetysec.managers.LocationManager
+import pt.isec.amov.safetysec.managers.SensorManager
 import java.util.Date
 
 class ProtegidoViewModel (
     private val locationManager: LocationManager,
+    private val sensorManager: SensorManager, // <--- Agora é uma propriedade (private val)
     private val firestoreRepository: FirestoreRepository
-    ) : ViewModel()
+) : ViewModel()
 {
-    private var monitoringJob: Job? = null
-    // Lista de regras ativas para este protegido (deverás carregar isto do Firestore)
-    var activeRules by mutableStateOf<List<Rule>>(emptyList())
+    // --- ESTADOS DE CARREGAMENTO E MENSAGENS ---
     var isLoading by mutableStateOf(false)
     var errorMessage by mutableStateOf<String?>(null)
     var successMessage by mutableStateOf<String?>(null)
-    var activeAlertId by mutableStateOf<String?>(null) //se for null está tudo nice
 
-    var isCountingDown by mutableStateOf(false)
-    var countdownValue by mutableStateOf(10)
-    private var countdownJob: Job? = null
-
-    var currentAlertType by mutableStateOf(RuleType.UNKNOWN) //Para saber se é Pânico, Velocidade, etc.
-    var alertHistory by mutableStateOf<List<Alert>>(emptyList())
-        private set
-
-    // --- NOVA LISTA DE REGRAS ---
+    // --- DADOS ---
+    // A lista de regras que vem do Firestore (atualizada em tempo real)
     var rules by mutableStateOf<List<Rule>>(emptyList())
         private set
 
+    var alertHistory by mutableStateOf<List<Alert>>(emptyList())
+        private set
+
+    // --- ESTADOS DE ALERTA ---
+    var activeAlertId by mutableStateOf<String?>(null) // ID do alerta se já foi enviado para a BD
+    var isCountingDown by mutableStateOf(false)        // Se estamos nos 10s de carência
+    var countdownValue by mutableIntStateOf(10)
+    var currentAlertType by mutableStateOf(RuleType.UNKNOWN)
+
+    // --- CONTROLO INTERNO ---
+    private var monitoringJob: Job? = null
+    private var countdownJob: Job? = null
+    private var sensorJob: Job? = null // <--- Job para os sensores
+
+    // Variável para lógica de inatividade: guarda o momento da última vez que o user se mexeu
+    private var lastMovementTime: Long = System.currentTimeMillis()
+    // Variável para evitar spam de alertas (ex: só alerta a cada 30s se a regra continuar quebrada)
+    private var lastTriggerTime: Long = 0
+
+
+    // =========================================================================
+    // 1. INICIALIZAÇÃO E LISTAGENS
+    // =========================================================================
+
+    // Inicia a escuta das regras (Chamar no LaunchedEffect do Dashboard)
+    fun startObservingRules(userId: String) {
+        firestoreRepository.listenToRules(userId) { listaAtualizada ->
+            rules = listaAtualizada
+        }
+    }
 
     fun fetchAlertHistory(userId: String) {
         viewModelScope.launch {
@@ -54,55 +76,44 @@ class ProtegidoViewModel (
         }
     }
 
-    // Inicia a escuta das regras (chamado ao entrar no ecrã)
-    fun startObservingRules(userId: String) {
-        firestoreRepository.listenToRules(userId) { listaAtualizada ->
-            rules = listaAtualizada
-        }
-    }
-
     // Aceitar (true) ou Revogar (false) uma regra
     fun toggleRule(ruleId: String, novoEstado: Boolean) {
-        Log.d("SafetySec", "Tentativa de alterar regra: ID='$ruleId' para Estado=$novoEstado")
-
-        if (ruleId.isBlank()) {
-            Log.e("SafetySec", "ERRO FATAL: O ID da regra está vazio! A regra não foi gravada corretamente.")
-            return
-        }
+        if (ruleId.isBlank()) return
 
         viewModelScope.launch {
-            val result = firestoreRepository.updateRuleStatus(ruleId, novoEstado)
-
-            if (result.isSuccess) {
-                Log.d("SafetySec", "SUCESSO: Estado atualizado no Firestore.")
-            } else {
-                val erro = result.exceptionOrNull()?.message
-                Log.e("SafetySec", "ERRO ao atualizar: $erro")
-            }
+            firestoreRepository.updateRuleStatus(ruleId, novoEstado)
         }
     }
 
-    fun startPanicProcess(user: User) {
-        if (activeAlertId != null) return
-        triggerAlertProcess(RuleType.BOTAO_PANICO,user)
-    }
+    // =========================================================================
+    // 2. MOTOR DE MONITORIZAÇÃO AUTOMÁTICA (GPS + SENSORES)
+    // =========================================================================
 
     /**
-     * Inicia a monitorização ativa de GPS para Velocidade e Inatividade
+     * Inicia a monitorização ativa de GPS (Velocidade, Inatividade, Geofencing).
      */
     fun startAutomaticMonitoring(user: User) {
-        monitoringJob?.cancel() // Garante que não há duplicados
+        // Se já estiver a correr, não duplica
+        if (monitoringJob?.isActive == true) return
 
         monitoringJob = viewModelScope.launch {
-            locationManager.getLocationUpdates(intervalMs = 10000L).collectLatest { locationData ->
+            // Obtemos atualizações a cada 2 segundos
+            locationManager.getLocationUpdates(intervalMs = 2000L).collectLatest { locationData ->
 
-                // 1. Verificar Velocidade
-                checkSpeedLimit(locationData.speedKmh, user)
+                // A. Atualizar lógica de movimento (para a regra de inatividade)
+                if (locationData.speedKmh > 2.0) {
+                    // Consideramos "movimento" se for maior que 2km/h
+                    lastMovementTime = System.currentTimeMillis()
+                }
 
-                // 2. Verificar Inatividade
-                checkInactivity(locationData.timeStamp, user)
+                // B. Verificar Regras de GPS (Apenas se não estivermos já num processo de alerta)
+                if (!isCountingDown && activeAlertId == null) {
+                    checkSpeedLimit(locationData.speedKmh, user)
+                    checkInactivity(user)
+                    checkGeofencing(locationData.latitude, locationData.longitude, user)
+                }
 
-                // 3. Atualizar última localização conhecida no Firestore para o Monitor ver
+                // C. Atualizar última localização conhecida no Firestore
                 firestoreRepository.updateLastLocation(
                     user.id,
                     locationData.latitude,
@@ -113,9 +124,38 @@ class ProtegidoViewModel (
         }
     }
 
+    /**
+     * Inicia a monitorização de SENSORES (Queda e Acidente).
+     * Deve ser chamado no ProtectedDashboard junto com o startAutomaticMonitoring.
+     */
+    fun startSensorMonitoring(user: User) {
+        if (sensorJob?.isActive == true) return
+
+        sensorJob = viewModelScope.launch {
+            sensorManager.getAccelerationEvents().collect { eventType ->
+                // Se já estivermos num alerta, ignorar
+                if (activeAlertId != null || isCountingDown) return@collect
+
+                when (eventType) {
+                    "QUEDA" -> {
+                        val ruleQueda = rules.find { it.type == RuleType.QUEDA && it.isActive }
+                        if (ruleQueda != null) {
+                            triggerAlertProcess(RuleType.QUEDA, user)
+                        }
+                    }
+                    "ACIDENTE" -> {
+                        val ruleAcidente = rules.find { it.type == RuleType.ACIDENTE && it.isActive }
+                        if (ruleAcidente != null) {
+                            triggerAlertProcess(RuleType.ACIDENTE, user)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private fun checkSpeedLimit(currentSpeed: Double, user: User) {
-        val speedRule = activeRules.find { it.type == RuleType.CONTROLO_VELOCIDADE && it.isActive }
+        val speedRule = rules.find { it.type == RuleType.CONTROLO_VELOCIDADE && it.isActive }
         speedRule?.valueDouble?.let { limit ->
             if (currentSpeed > limit) {
                 triggerAlertProcess(RuleType.CONTROLO_VELOCIDADE, user)
@@ -123,61 +163,79 @@ class ProtegidoViewModel (
         }
     }
 
-    private fun checkInactivity(lastMovementTime: Long, user: User) {
-        val inactivityRule = activeRules.find { it.type == RuleType.INATIVIDADE && it.isActive }
+    private fun checkInactivity(user: User) {
+        val inactivityRule = rules.find { it.type == RuleType.INATIVIDADE && it.isActive }
         inactivityRule?.valueDouble?.let { maxMinutes ->
-            val diffMinutes = (System.currentTimeMillis() - lastMovementTime) / 60000
+            val diffMillis = System.currentTimeMillis() - lastMovementTime
+            val diffMinutes = diffMillis / 60000.0
+
             if (diffMinutes >= maxMinutes) {
                 triggerAlertProcess(RuleType.INATIVIDADE, user)
             }
         }
     }
 
-    /**
-     * Esta função é a ponte para o trabalho do teu colega.
-     * Ela deve iniciar o timer de 10s antes de enviar o alerta final.
-     */
+    private fun checkGeofencing(lat: Double, lon: Double, user: User) {
+        val geoRules = rules.filter { it.type == RuleType.GEOFENCING && it.isActive }
+
+        for (rule in geoRules) {
+            if (rule.latitude != null && rule.longitude != null && rule.radius != null) {
+                val results = FloatArray(1)
+                android.location.Location.distanceBetween(lat, lon, rule.latitude, rule.longitude, results)
+                val distanceInMeters = results[0]
+
+                // --- LOG DE DEBUG PARA GEOFENCING ---
+                android.util.Log.d("SafetySec_Geo", "Distância: ${distanceInMeters.toInt()}m | Raio: ${rule.radius}m")
+
+                if (distanceInMeters > rule.radius) {
+                    android.util.Log.d("SafetySec_Geo", "ALERTA DISPARADO!")
+                    triggerAlertProcess(RuleType.GEOFENCING, user)
+                    break
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 3. GESTÃO DE ALERTAS E PÂNICO
+    // =========================================================================
+
+    fun startPanicProcess(user: User) {
+        triggerAlertProcess(RuleType.BOTAO_PANICO, user)
+    }
+
     private fun triggerAlertProcess(type: RuleType, user: User) {
+        val now = System.currentTimeMillis()
+        if (now - lastTriggerTime < 30_000 && type != RuleType.BOTAO_PANICO) return
+
         if (activeAlertId != null || isCountingDown) return
 
-        // 2. Configura a UI para mostrar a contagem
+        lastTriggerTime = now
         currentAlertType = type
         isCountingDown = true
         countdownValue = 10
         errorMessage = null
         successMessage = null
 
-        // Inicia o Timer (Igual ao botão de pânico)
+        countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
             while (countdownValue > 0) {
                 delay(1000L)
                 countdownValue--
             }
-            // O tempo acabou, Enviamos para a Base de Dados!
+            // Tempo acabou: Enviar para o Firestore!
             isCountingDown = false
-            sendAlert(user, type) // Chama a função que cria o alerta no Firestore
+            sendAlert(user, type)
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        monitoringJob?.cancel()
-    }
-
-
-    fun sendAlert (user : User,type: RuleType){
+    private fun sendAlert(user: User, type: RuleType) {
         isLoading = true
-        errorMessage = null
-        successMessage = null
 
         viewModelScope.launch {
             val location = locationManager.getCurrentLocation()
-
-            if (location == null){
-                errorMessage = "Não foi possível obter a localização (gps desligado ou erro)."
-                isLoading = false
-                return@launch
-            }
+            val lat = location?.latitude ?: user.lastLatitude ?: 0.0
+            val lon = location?.longitude ?: user.lastLongitude ?: 0.0
 
             val alert = Alert(
                 id = "",
@@ -185,8 +243,8 @@ class ProtegidoViewModel (
                 userEmail = user.email,
                 protectedId = user.id,
                 date = Date(),
-                latitude = location.latitude,
-                longitude = location.longitude,
+                latitude = lat,
+                longitude = lon,
                 solved = false,
                 cancelled = false
             )
@@ -196,12 +254,17 @@ class ProtegidoViewModel (
             isLoading = false
             if (result.isSuccess) {
                 activeAlertId = result.getOrNull()
-                successMessage = "ALERTA ENVIADO! O monitor foi notificado."
+                successMessage = "ALERTA ENVIADO! Os monitores foram notificados."
             } else {
-                errorMessage = result.exceptionOrNull()?.message ?: "Erro ao enviar alerta."
+                errorMessage = "Erro ao enviar alerta: ${result.exceptionOrNull()?.message}"
+                activeAlertId = null
             }
         }
     }
+
+    // =========================================================================
+    // 4. CANCELAMENTO (PIN)
+    // =========================================================================
 
     fun handleCancelRequest(inputPin: String, correctPin: String) {
         if (inputPin != correctPin) {
@@ -209,41 +272,50 @@ class ProtegidoViewModel (
             return
         }
 
-        // CASO A: Estamos na contagem decrescente?
         if (isCountingDown) {
-            countdownJob?.cancel() // Pára o relógio
+            countdownJob?.cancel()
             isCountingDown = false
             countdownValue = 10
-            successMessage = "Envio abortado. Nada foi enviado."
+            successMessage = "Alerta cancelado a tempo."
+            errorMessage = null
             return
         }
 
-        // CASO B: O alerta já foi enviado?
         if (activeAlertId != null) {
             cancelPanicAlert(activeAlertId!!)
         }
     }
-    fun cancelPanicAlert (alertId: String){
+
+    private fun cancelPanicAlert(alertId: String) {
         isLoading = true
         viewModelScope.launch {
             val result = firestoreRepository.cancelAlert(alertId)
             isLoading = false
+
             if (result.isSuccess) {
                 activeAlertId = null
-                successMessage = "Alerta na base de dados cancelado."
+                successMessage = "Alerta cancelado. O monitor foi avisado."
             } else {
-                errorMessage = "Erro ao cancelar na BD."
+                errorMessage = "Não foi possível cancelar o alerta na base de dados."
             }
-        }    }
-}
+        }
+    }
 
+    override fun onCleared() {
+        super.onCleared()
+        monitoringJob?.cancel()
+        countdownJob?.cancel()
+        sensorJob?.cancel() // Cancelar também os sensores
+    }
 
-class ProtegidoViewModelFactory(
-    private val locationManager: LocationManager,
-    private val firestoreRepository: FirestoreRepository
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return ProtegidoViewModel(locationManager, firestoreRepository) as T
+    class ProtegidoViewModelFactory(
+        private val locationManager: LocationManager,
+        private val sensorManager: SensorManager,
+        private val firestoreRepository: FirestoreRepository
+    ) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return ProtegidoViewModel(locationManager, sensorManager, firestoreRepository) as T
+        }
     }
 }

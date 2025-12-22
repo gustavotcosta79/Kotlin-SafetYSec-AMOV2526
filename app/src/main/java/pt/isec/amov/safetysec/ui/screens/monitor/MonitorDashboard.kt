@@ -1,8 +1,10 @@
 package pt.isec.amov.safetysec.ui.screens.monitor
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -211,46 +213,92 @@ fun MonitorDashboard(
             title = { Text("Nova Regra") },
             text = {
                 Column {
-                    Text("Tipo:", style = MaterialTheme.typography.labelMedium)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Text("Tipo de Regra:", style = MaterialTheme.typography.labelMedium)
+
+                    // 1. Adicionado scroll horizontal para caberem todas as opções
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()), // Permite deslizar
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Opções existentes
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.CONTROLO_VELOCIDADE,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.CONTROLO_VELOCIDADE },
-                            label = { Text("Veloc.") }
+                            label = { Text("Velocidade") }
                         )
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.INATIVIDADE,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.INATIVIDADE },
-                            label = { Text("Inativ.") }
+                            label = { Text("Inatividade") }
                         )
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.GEOFENCING,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.GEOFENCING },
-                            label = { Text("Area") }
+                            label = { Text("Area/Geo") }
+                        )
+                        // 2. Novas opções (Queda e Acidente)
+                        FilterChip(
+                            selected = monitorViewModel.selectedRuleType == RuleType.QUEDA,
+                            onClick = { monitorViewModel.selectedRuleType = RuleType.QUEDA },
+                            label = { Text("Queda") }
+                        )
+                        FilterChip(
+                            selected = monitorViewModel.selectedRuleType == RuleType.ACIDENTE,
+                            onClick = { monitorViewModel.selectedRuleType = RuleType.ACIDENTE },
+                            label = { Text("Acidente") }
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 3. Lógica para saber se o campo Valor deve estar ativo
+                    // Apenas Velocidade, Inatividade e Geofencing precisam de valor numérico
+                    val needsValue = when (monitorViewModel.selectedRuleType) {
+                        RuleType.QUEDA, RuleType.ACIDENTE, RuleType.BOTAO_PANICO -> false
+                        else -> true
+                    }
+
+                    // 4. Campo Valor (Ativo ou Inativo)
                     OutlinedTextField(
-                        value = monitorViewModel.ruleValueInput,
-                        onValueChange = { monitorViewModel.ruleValueInput = it },
-                        label = { Text("Valor (Km/h, Minutos ou Raio)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        value = if (needsValue) monitorViewModel.ruleValueInput else "N/A", // Mostra N/A se inativo
+                        onValueChange = {
+                            if (needsValue) monitorViewModel.ruleValueInput = it
+                        },
+                        label = {
+                            Text(if (needsValue) "Valor (Km/h, Min, Raio)" else "Sem parâmetro necessário")
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        enabled = needsValue, // <--- Aqui bloqueamos o campo
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            disabledTextColor = Color.Gray
+                        )
                     )
+
                     Spacer(modifier = Modifier.height(8.dp))
+
+                    // Campo Descrição (Sempre ativo)
                     OutlinedTextField(
                         value = monitorViewModel.ruleDescription,
                         onValueChange = { monitorViewModel.ruleDescription = it },
-                        label = { Text("Descrição") }
+                        label = { Text("Descrição (Opcional)") },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    monitorViewModel.submitRule(
-                        monitorId = authViewModel.currentUser?.id ?: "",
-                        protectedId = userParaGerirRegras!!.id,
-                        onFinished = { showAddRuleDialog = false }
-                    )
+                    // Verificação de segurança
+                    if (userParaGerirRegras != null) {
+                        monitorViewModel.submitRule(
+                            monitorId = authViewModel.currentUser?.id ?: "",
+                            targetUser = userParaGerirRegras!!, // <--- MUDANÇA: Passamos o user objeto
+                            onFinished = { showAddRuleDialog = false }
+                        )
+                    }
                 }) { Text("Criar") }
             },
             dismissButton = {
@@ -258,7 +306,6 @@ fun MonitorDashboard(
             }
         )
     }
-
     // =====================================================================
     // DIÁLOGO: EDITAR REGRA EXISTENTE
     // =====================================================================

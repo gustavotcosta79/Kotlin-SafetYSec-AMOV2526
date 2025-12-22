@@ -140,8 +140,9 @@ class AuthViewModel : ViewModel() {
 
     fun startObservingAlerts() {
         val user = currentUser ?: return
-        // Usamos os emails dos protegidos que já estão na lista monitoredUsers
-        val targets = monitoredUsers.map { it.email }
+
+        // CORREÇÃO: Agora mapeamos para ID, não para Email
+        val targets = monitoredUsers.map { it.id }
 
         if (targets.isNotEmpty()) {
             firestoreRepository.listenForAlerts(targets) { alerts ->
@@ -149,7 +150,6 @@ class AuthViewModel : ViewModel() {
             }
         }
     }
-
     fun fetchCurrentUser() {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
@@ -162,7 +162,6 @@ class AuthViewModel : ViewModel() {
             }
         }
     }
-
 
 
     fun fetchMonitoredUsers() {
