@@ -285,4 +285,15 @@ class FirestoreRepository {
             Result.failure(e)
         }
     }
+
+    // Atualizar um alerta existente com o URL/Caminho do vídeo
+    suspend fun updateAlertVideo(alertId: String, videoUrl: String): Result<Unit> {
+        return try {
+            db.collection("alerts").document(alertId)
+                .update("videoUrl", videoUrl).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

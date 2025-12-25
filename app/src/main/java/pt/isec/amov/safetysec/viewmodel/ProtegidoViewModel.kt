@@ -22,7 +22,7 @@ import java.util.Date
 
 class ProtegidoViewModel (
     private val locationManager: LocationManager,
-    private val sensorManager: SensorManager, // <--- Agora é uma propriedade (private val)
+    private val sensorManager: SensorManager,
     private val firestoreRepository: FirestoreRepository
 ) : ViewModel()
 {
@@ -316,6 +316,34 @@ class ProtegidoViewModel (
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             return ProtegidoViewModel(locationManager, sensorManager, firestoreRepository) as T
+        }
+    }
+
+
+    // Função para fazer upload e atualizar o alerta
+    fun uploadAndLinkVideo(
+        file: java.io.File,
+        cameraManager: pt.isec.amov.safetysec.managers.CameraManager,
+        onComplete: () -> Unit
+    ) {
+        val alertId = activeAlertId ?: return // Só fazemos se houver alerta
+
+        viewModelScope.launch {
+            // 1. Faz upload usando o manager
+            val downloadUrl = cameraManager.uploadVideo(file)
+
+            // 2. Se correu bem, atualiza o documento do alerta no Firestore
+            if (downloadUrl != null) {
+                firestoreRepository.updateAlertVideo(alertId, downloadUrl)
+                successMessage = "Vídeo enviado com sucesso!"
+            } else {
+                errorMessage = "Falha ao enviar vídeo (verifique a internet)."
+            }
+
+            // 3. Limpa o ficheiro local para não ocupar espaço
+            try { file.delete() } catch(e: Exception){}
+
+            onComplete()
         }
     }
 }

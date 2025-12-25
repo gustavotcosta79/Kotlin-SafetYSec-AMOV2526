@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.maps.model.LatLng
@@ -89,6 +90,22 @@ fun MonitorDashboard(
                                     supportingContent = {
                                         Column {
                                             Text("Data: $dataFormatada")
+
+                                            if (alert.videoUrl.isNotBlank()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+                                                Button(
+                                                    onClick = { uriHandler.openUri(alert.videoUrl) },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                                                    modifier = Modifier.height(35.dp)
+                                                ) {
+                                                    Icon(Icons.Default.PlayCircle, null, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Ver Vídeo de Prova", fontSize = 12.sp)
+                                                }
+                                            }
+
                                             val estado = when {
                                                 alert.cancelled -> "Cancelado"
                                                 alert.solved -> "Resolvido"
