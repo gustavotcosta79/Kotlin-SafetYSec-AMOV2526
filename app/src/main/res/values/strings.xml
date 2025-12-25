@@ -147,4 +147,12 @@
     <string name="default_desc_accident">Accident Detection Rule</string>
     <string name="default_desc_panic">Panic Button Rule</string>
     <string name="default_desc_unknown">Safety Rule</string>
+
+    <string name="forgot_password_link">Forgot your password?</string>
+    <string name="recover_password_title">Recover Password</string>
+    <string name="recover_password_desc">Enter your email to receive a reset link.</string>
+    <string name="btn_send">Send</string>
+    <string name="msg_recovery_email_sent">Recovery email sent! Check your inbox.</string>
+    <string name="error_email_required">Please enter your email.</string>
+    <string name="error_recovery_failed">Failed to send recovery email.</string>
 </resources>

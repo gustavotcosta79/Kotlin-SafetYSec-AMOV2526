@@ -347,4 +347,27 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = false
         }
     }
+
+    fun recoverPassword(emailRecovery: String, onFinished: () -> Unit) {
+        if (emailRecovery.isBlank()) {
+            errorMessage = getString(R.string.error_email_required)
+            return
+        }
+
+        isLoading = true
+        errorMessage = null
+        successMessage = null
+
+        viewModelScope.launch {
+            val result = authRepository.sendPasswordResetEmail(emailRecovery)
+            isLoading = false
+
+            if (result.isSuccess) {
+                successMessage = getString(R.string.msg_recovery_email_sent)
+                onFinished() // Fecha o diálogo
+            } else {
+                errorMessage = getString(R.string.error_recovery_failed)
+            }
+        }
+    }
 }

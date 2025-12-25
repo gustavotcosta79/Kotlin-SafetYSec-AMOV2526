@@ -1,5 +1,6 @@
 package pt.isec.amov.safetysec.ui.screens.auth
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -20,27 +21,40 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 
 @Composable
-fun LoginScreen (
+fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     viewModel: AuthViewModel = viewModel()
-){
-    var passwordVisible by remember { mutableStateOf(false)}
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
 
-    Column (
+    // --- NOVO ESTADO: Controla se o diálogo de recuperação está visível ---
+    var showRecoverDialog by remember { mutableStateOf(false) }
+    var recoverEmail by remember { mutableStateOf("") }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
-    ){
+    ) {
         Text(
-            text = "SafetYSec",
+            text = stringResource(R.string.login_title),
             style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.primary
         )
 
         Spacer(modifier = Modifier.height(32.dp))
+
+        // MENSAGEM DE SUCESSO (Ex: Email enviado)
+        if (viewModel.successMessage != null) {
+            Text(
+                text = viewModel.successMessage!!,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
 
         // Campo Email
         OutlinedTextField(
@@ -77,6 +91,22 @@ fun LoginScreen (
             singleLine = true
         )
 
+        // --- NOVO: Link "Esqueci-me da password" ---
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            Text(
+                text = stringResource(R.string.forgot_password_link),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable {
+                        recoverEmail = viewModel.email // Pré-preenche se já tiver escrito algo
+                        showRecoverDialog = true
+                    }
+                    .padding(vertical = 8.dp)
+            )
+        }
+        // -------------------------------------------
+
         // Mensagem de Erro
         if (viewModel.errorMessage != null) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -88,7 +118,7 @@ fun LoginScreen (
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Botão Login (Mostra rodinha se estiver a carregar)
+        // Botão Login
         if (viewModel.isLoading) {
             CircularProgressIndicator()
         } else {
@@ -106,5 +136,42 @@ fun LoginScreen (
         TextButton(onClick = onNavigateToRegister) {
             Text(stringResource(R.string.no_account_link))
         }
+    }
+
+    // --- NOVO: DIÁLOGO DE RECUPERAÇÃO ---
+    if (showRecoverDialog) {
+        AlertDialog(
+            onDismissRequest = { showRecoverDialog = false },
+            title = { Text(stringResource(R.string.recover_password_title)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.recover_password_desc))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = recoverEmail,
+                        onValueChange = { recoverEmail = it },
+                        label = { Text(stringResource(R.string.email_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.recoverPassword(recoverEmail) {
+                            showRecoverDialog = false
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.btn_send))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRecoverDialog = false }) {
+                    Text(stringResource(R.string.btn_cancel))
+                }
+            }
+        )
     }
 }

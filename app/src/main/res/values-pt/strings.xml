@@ -147,4 +147,12 @@
     <string name="default_desc_accident">Regra de Acidente</string>
     <string name="default_desc_panic">Regra de Botão de Pânico</string>
     <string name="default_desc_unknown">Regra de Segurança</string>
+
+    <string name="forgot_password_link">Esqueceu-se da password?</string>
+    <string name="recover_password_title">Recuperar Password</string>
+    <string name="recover_password_desc">Introduza o seu email para receber um link de redefinição.</string>
+    <string name="btn_send">Enviar</string>
+    <string name="msg_recovery_email_sent">Email de recuperação enviado! Verifique a caixa de entrada.</string>
+    <string name="error_email_required">Introduza o seu email.</string>
+    <string name="error_recovery_failed">Falha ao enviar email de recuperação.</string>
 </resources>
