@@ -296,4 +296,30 @@ class FirestoreRepository {
             Result.failure(e)
         }
     }
+
+    // Adicionar Janela
+    suspend fun addTimeWindow(userId: String, window: pt.isec.amov.safetysec.data.model.TimeWindow) {
+        try {
+            val ref = db.collection("users").document(userId).collection("time_windows").document()
+            val windowWithId = window.copy(id = ref.id)
+            ref.set(windowWithId).await()
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    // Obter Janelas (Ouve em tempo real)
+    fun listenToTimeWindows(userId: String, onUpdate: (List<pt.isec.amov.safetysec.data.model.TimeWindow>) -> Unit) {
+        db.collection("users").document(userId).collection("time_windows")
+            .addSnapshotListener { snapshot, _ ->
+                val windows = snapshot?.toObjects(pt.isec.amov.safetysec.data.model.TimeWindow::class.java) ?: emptyList()
+                onUpdate(windows)
+            }
+    }
+
+    // Apagar Janela
+    suspend fun deleteTimeWindow(userId: String, windowId: String) {
+        try {
+            db.collection("users").document(userId).collection("time_windows")
+                .document(windowId).delete().await()
+        } catch (e: Exception) { e.printStackTrace() }
+    }
 }

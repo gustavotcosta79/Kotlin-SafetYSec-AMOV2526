@@ -77,6 +77,7 @@ fun ProtectedDashboard(
     val isCounting = protegidoViewModel.isCountingDown
     val isAlertSent = protegidoViewModel.activeAlertId != null
     val isInCancelMode = isCounting || isAlertSent
+    var showTimeWindowDialog by remember {mutableStateOf(false)}
 
     // --- CARREGAR DADOS INICIAIS E MONITORIZAÇÃO ---
     LaunchedEffect(user) {
@@ -84,6 +85,8 @@ fun ProtectedDashboard(
             // 1. Carregar dados do Firestore
             protegidoViewModel.startObservingRules(user.id)
             authViewModel.fetchAssociatedMonitors()
+
+            protegidoViewModel.startTimeWindowObservation(user.id)
 
             // 2. Ligar o Motor de Monitorização (GPS + Sensores)
             protegidoViewModel.startAutomaticMonitoring(user)
@@ -156,6 +159,7 @@ fun ProtectedDashboard(
 
             // --- CABEÇALHO ---
             Row(verticalAlignment = Alignment.CenterVertically) {
+
                 // Botão Perfil
                 IconButton(onClick = onNavigateToProfile) { Icon(Icons.Default.AccountCircle, "Perfil") }
 
@@ -164,6 +168,14 @@ fun ProtectedDashboard(
 
                 // Botão Histórico
                 IconButton(onClick = { if (user != null) { protegidoViewModel.fetchAlertHistory(user.id); showHistoryDialog = true } }) { Icon(Icons.Default.History, "Histórico") }
+
+                //botao para ver as janelas temporais das regras
+                IconButton(onClick = {
+                    protegidoViewModel.startTimeWindowObservation(user!!.id)
+                    showTimeWindowDialog = true
+                }) {
+                    Icon(Icons.Default.Schedule, "Horários")
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) { Text("Sair") }
@@ -321,7 +333,7 @@ fun ProtectedDashboard(
         }
 
         // =========================================================
-        // 6. CÂMARA OVERLAY (Aparece automaticamente) - NOVO
+        // CÂMARA OVERLAY (Aparece automaticamente)
         // =========================================================
         if (showCameraPreview) {
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -374,7 +386,7 @@ fun ProtectedDashboard(
         }
 
         // =========================================================
-        // 7. LOADING OVERLAY (Enquanto faz upload) - NOVO
+        // LOADING OVERLAY (Enquanto faz upload)
         // =========================================================
         if (isUploading) {
             Box(
@@ -392,5 +404,96 @@ fun ProtectedDashboard(
                 }
             }
         }
+    }
+
+    // =========================================================
+    // DIÁLOGO DE GESTÃO DE HORÁRIOS (TIME WINDOWS)
+    // =========================================================
+    if (showTimeWindowDialog) {
+        var newName by remember { mutableStateOf("") }
+        var startH by remember { mutableStateOf("09") }
+        var endH by remember { mutableStateOf("18") }
+        // Dias: Dom, Seg, Ter, Qua, Qui, Sex, Sab
+        val days = remember { mutableStateListOf(false, true, true, true, true, true, false) }
+        val dayNames = listOf("D", "S", "T", "Q", "Q", "S", "S")
+
+        AlertDialog(
+            onDismissRequest = { showTimeWindowDialog = false },
+            title = { Text("Janelas de Monitorização") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Defina quando quer ser monitorizado. Se a lista estiver vazia, será monitorizado 24h.", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // LISTA DE JANELAS EXISTENTES
+                    LazyColumn(modifier = Modifier.heightIn(max = 150.dp)) {
+                        items(protegidoViewModel.timeWindows) { window ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(window.name, fontWeight = FontWeight.Bold)
+                                    Text("${window.startHour}:00 - ${window.endHour}:00", fontSize = 12.sp)
+                                }
+                                IconButton(onClick = { if (user != null) protegidoViewModel.deleteTimeWindow(user.id, window.id) }) {
+                                    Icon(Icons.Default.Delete, "Apagar", tint = Color.Red)
+                                }
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Adicionar Novo Horário:", fontWeight = FontWeight.Bold)
+
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("Nome (ex: Trabalho)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        OutlinedTextField(value = startH, onValueChange = { startH = it }, label = { Text("Início (H)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedTextField(value = endH, onValueChange = { endH = it }, label = { Text("Fim (H)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    }
+
+                    Text("Dias da Semana:", modifier = Modifier.padding(top=8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        dayNames.forEachIndexed { index, name ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(name, fontSize = 10.sp)
+                                Checkbox(
+                                    checked = days[index],
+                                    onCheckedChange = { days[index] = it }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newName.isNotEmpty() && user != null) {
+                        val s = startH.toIntOrNull() ?: 9
+                        val e = endH.toIntOrNull() ?: 18
+                        val newWindow = pt.isec.amov.safetysec.data.model.TimeWindow(
+                            name = newName,
+                            startHour = s,
+                            endHour = e,
+                            activeDays = days.toList()
+                        )
+                        protegidoViewModel.addTimeWindow(user.id, newWindow)
+                        newName = "" // Reset
+                    }
+                }) { Text("Adicionar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimeWindowDialog = false }) { Text("Fechar") }
+            }
+        )
     }
 }

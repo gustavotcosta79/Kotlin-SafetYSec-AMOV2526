@@ -2,6 +2,7 @@ package pt.isec.amov.safetysec.viewmodel
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 import pt.isec.amov.safetysec.data.model.Alert
 import pt.isec.amov.safetysec.data.model.Rule
 import pt.isec.amov.safetysec.data.model.RuleType
+import pt.isec.amov.safetysec.data.model.TimeWindow
 import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
 import pt.isec.amov.safetysec.managers.LocationManager
@@ -55,6 +57,8 @@ class ProtegidoViewModel (
     // Variável para evitar spam de alertas (ex: só alerta a cada 30s se a regra continuar quebrada)
     private var lastTriggerTime: Long = 0
 
+    var timeWindows = mutableStateListOf<TimeWindow>()
+    private set
 
     // =========================================================================
     // 1. INICIALIZAÇÃO E LISTAGENS
@@ -85,6 +89,28 @@ class ProtegidoViewModel (
         }
     }
 
+    fun startTimeWindowObservation(userId: String) {
+        firestoreRepository.listenToTimeWindows(userId) { windows ->
+            timeWindows.clear()
+            timeWindows.addAll(windows)
+        }
+    }
+
+    fun addTimeWindow(userId: String, window: pt.isec.amov.safetysec.data.model.TimeWindow) {
+        viewModelScope.launch { firestoreRepository.addTimeWindow(userId, window) }
+    }
+
+    fun deleteTimeWindow(userId: String, windowId: String) {
+        viewModelScope.launch { firestoreRepository.deleteTimeWindow(userId, windowId) }
+    }
+
+    private fun isMonitoringAllowed(): Boolean {
+        // Se não houver janelas definidas, assumimos proteção 24/7 (Retorna TRUE)
+        if (timeWindows.isEmpty()) return true
+
+        // Se houver janelas, só monitorizamos se estivermos DENTRO de pelo menos uma
+        return timeWindows.any { it.isActiveNow() }
+    }
     // =========================================================================
     // 2. MOTOR DE MONITORIZAÇÃO AUTOMÁTICA (GPS + SENSORES)
     // =========================================================================
@@ -98,7 +124,12 @@ class ProtegidoViewModel (
 
         monitoringJob = viewModelScope.launch {
             // Obtemos atualizações a cada 2 segundos
-            locationManager.getLocationUpdates(intervalMs = 2000L).collectLatest { locationData ->
+            locationManager.getLocationUpdates(intervalMs = 2000L).collect { locationData ->
+
+                if (!isMonitoringAllowed()) {
+                    lastMovementTime = System.currentTimeMillis()
+                    return@collect
+                }
 
                 // A. Atualizar lógica de movimento (para a regra de inatividade)
                 if (locationData.speedKmh > 2.0) {
@@ -134,7 +165,7 @@ class ProtegidoViewModel (
         sensorJob = viewModelScope.launch {
             sensorManager.getAccelerationEvents().collect { eventType ->
                 // Se já estivermos num alerta, ignorar
-                if (activeAlertId != null || isCountingDown) return@collect
+                if (activeAlertId != null || isCountingDown || !isMonitoringAllowed()) return@collect
 
                 when (eventType) {
                     "QUEDA" -> {
