@@ -1,22 +1,31 @@
 package pt.isec.amov.safetysec.viewmodel
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import pt.isec.amov.safetysec.R
 import pt.isec.amov.safetysec.data.model.Alert
 import pt.isec.amov.safetysec.data.model.User
 import pt.isec.amov.safetysec.data.repository.AuthRepository
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
 
-class AuthViewModel : ViewModel() {
+// Mudámos de ViewModel() para AndroidViewModel(application) para ter acesso às strings
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
+
     // Instâncias do Firebase e Repositórios
     private val auth = FirebaseAuth.getInstance()
     private val authRepository = AuthRepository()
     private val firestoreRepository = FirestoreRepository()
+
+    // Helper para obter strings traduzidas
+    private fun getString(resId: Int, vararg args: Any): String {
+        return getApplication<Application>().getString(resId, *args)
+    }
 
     // Dados do formulário
     var name by mutableStateOf("")
@@ -37,7 +46,7 @@ class AuthViewModel : ViewModel() {
     var currentUser by mutableStateOf<User?>(null)
         private set
 
-    var connectionCode by mutableStateOf<String?>(null) // Código que o Protegido gera
+    var connectionCode by mutableStateOf<String?>(null)
         private set
 
     var monitoredUsers by mutableStateOf<List<User>>(emptyList())
@@ -45,7 +54,8 @@ class AuthViewModel : ViewModel() {
 
     var activeAlerts by mutableStateOf<List<Alert>>(emptyList())
         private set
-    var codeInput by mutableStateOf("") // Código que o Monitor escreve
+
+    var codeInput by mutableStateOf("")
 
     var editName by mutableStateOf("")
     var editCancellationCode by mutableStateOf("")
@@ -56,7 +66,6 @@ class AuthViewModel : ViewModel() {
         private set
 
     init {
-        // Se já existir sessão, carrega o perfil ao iniciar o ViewModel
         if (auth.currentUser != null) {
             fetchCurrentUser()
         }
@@ -69,11 +78,12 @@ class AuthViewModel : ViewModel() {
             editPassword = ""
             editConfirmPassword = ""
             errorMessage = null
-            successMessage = null // (Adiciona esta var no topo do VM se não tiveres)
+            successMessage = null
         }
     }
 
     var profileUpdateSuccess by mutableStateOf(false)
+
     fun onSaveChangesClick() {
         val user = currentUser ?: return
         errorMessage = null
@@ -83,15 +93,13 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             val updates = mutableMapOf<String, Any>()
 
-            // 1. Verificar alterações de Nome
             if (editName.isNotBlank() && editName != user.name) {
                 updates["name"] = editName
             }
 
-            // 2. Verificar alterações de Código (Só Protegido)
             if (user.isProtected) {
                 if (editCancellationCode.length < 4) {
-                    errorMessage = "O código deve ter pelo menos 4 dígitos."
+                    errorMessage = getString(R.string.error_pin_length)
                     isLoading = false
                     return@launch
                 }
@@ -100,69 +108,60 @@ class AuthViewModel : ViewModel() {
                 }
             }
 
-            // 3. Atualizar na BD
             if (updates.isNotEmpty()) {
                 val result = firestoreRepository.updateUserProfile(user.id, updates)
                 if (result.isFailure) {
-                    errorMessage = "Erro ao atualizar dados: ${result.exceptionOrNull()?.message}"
+                    errorMessage = getString(R.string.error_update_data, result.exceptionOrNull()?.message ?: "")
                     isLoading = false
                     return@launch
                 }
             }
 
-            // 4. Atualizar Password (se preenchida)
             if (editPassword.isNotBlank()) {
                 if (editPassword != editConfirmPassword) {
-                    errorMessage = "As passwords não coincidem."
+                    errorMessage = getString(R.string.error_passwords_mismatch)
                     isLoading = false
                     return@launch
                 }
                 if (editPassword.length < 6) {
-                    errorMessage = "A password deve ter pelo menos 6 caracteres."
+                    errorMessage = getString(R.string.error_password_length)
                     isLoading = false
                     return@launch
                 }
 
                 val passResult = authRepository.updatePassword(editPassword)
                 if (passResult.isFailure) {
-                    errorMessage = "Erro ao atualizar password. Talvez precise de fazer login novamente."
+                    errorMessage = getString(R.string.error_update_password)
                     isLoading = false
                     return@launch
                 }
             }
 
-            // Sucesso Total
-            fetchCurrentUser() // Atualiza os dados locais
+            fetchCurrentUser()
             isLoading = false
             profileUpdateSuccess = true
         }
     }
 
     fun startObservingAlerts() {
-        val user = currentUser ?: return
-
-        // CORREÇÃO: Agora mapeamos para ID, não para Email
         val targets = monitoredUsers.map { it.id }
-
         if (targets.isNotEmpty()) {
             firestoreRepository.listenForAlerts(targets) { alerts ->
                 activeAlerts = alerts
             }
         }
     }
+
     fun fetchCurrentUser() {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             val user = authRepository.getUserProfile(uid)
             currentUser = user
-
-            //tentar atualizar a lista logo ao carregar o user (se formos monitor claro)
             if (user != null && user.isMonitor){
                 fetchMonitoredUsersDirectly(user)
             }
         }
     }
-
 
     fun fetchMonitoredUsers() {
         val user = currentUser ?: return
@@ -187,7 +186,7 @@ class AuthViewModel : ViewModel() {
     // --- Lógica de Login ---
     fun onLoginClick(onSuccess: () -> Unit) {
         if (email.isBlank() || password.isBlank()) {
-            errorMessage = "Preencha todos os campos."
+            errorMessage = getString(R.string.error_fill_all_fields)
             return
         }
 
@@ -201,7 +200,7 @@ class AuthViewModel : ViewModel() {
                 currentUser = result.getOrNull()
                 onSuccess()
             } else {
-                errorMessage = result.exceptionOrNull()?.message ?: "Erro ao iniciar sessão."
+                errorMessage = result.exceptionOrNull()?.message ?: getString(R.string.error_login_generic)
             }
         }
     }
@@ -209,15 +208,15 @@ class AuthViewModel : ViewModel() {
     // --- Lógica de Registo ---
     fun onRegisterClick(onSuccess: () -> Unit) {
         if (name.isBlank() || email.isBlank() || password.isBlank()) {
-            errorMessage = "Preencha todos os campos."
+            errorMessage = getString(R.string.error_fill_all_fields)
             return
         }
         if (!isMonitor && !isProtected) {
-            errorMessage = "Selecione pelo menos um perfil."
+            errorMessage = getString(R.string.error_select_profile)
             return
         }
         if (isProtected && cancellationCode.length < 4) {
-            errorMessage = "O código de cancelamento deve ter pelo menos 4 dígitos."
+            errorMessage = getString(R.string.error_cancel_code_length)
             return
         }
 
@@ -232,12 +231,11 @@ class AuthViewModel : ViewModel() {
             if (result.isSuccess) {
                 onSuccess()
             } else {
-                errorMessage = result.exceptionOrNull()?.message ?: "Erro no registo."
+                errorMessage = result.exceptionOrNull()?.message ?: getString(R.string.error_register_generic)
             }
         }
     }
 
-    // --- Lógica de Logout ---
     fun onLogoutClick(onSuccess: () -> Unit) {
         auth.signOut()
         currentUser = null
@@ -245,7 +243,6 @@ class AuthViewModel : ViewModel() {
         onSuccess()
     }
 
-    // --- Lógica de Associação (Protegido gera o código) ---
     fun generateCode() {
         val user = currentUser ?: return
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -259,16 +256,15 @@ class AuthViewModel : ViewModel() {
             if (result.isSuccess) {
                 connectionCode = newCode
             } else {
-                errorMessage = "Erro ao gerar código."
+                errorMessage = getString(R.string.error_generate_code)
             }
         }
     }
 
-    // --- Lógica de Associação (Monitor submete o código) ---
     fun onLinkSubmit(onSuccess: () -> Unit) {
         val monitor = currentUser ?: return
         if (codeInput.isBlank()) {
-            errorMessage = "Introduza o código gerado pelo protegido."
+            errorMessage = getString(R.string.error_enter_otp)
             return
         }
 
@@ -295,7 +291,7 @@ class AuthViewModel : ViewModel() {
 
             } else {
                 isLoading = false
-                errorMessage = result.exceptionOrNull()?.message ?: "Erro ao associar."
+                errorMessage = result.exceptionOrNull()?.message ?: getString(R.string.error_linking)
             }
         }
     }
@@ -308,31 +304,25 @@ class AuthViewModel : ViewModel() {
             val result = firestoreRepository.removeAssociation(monitor.id,protectedId)
 
             if (result.isSuccess){
-                // Atualizar a lista localmente removendo o user apagado (para ser instantâneo)
                 monitoredUsers = monitoredUsers.filter { it.id != protectedId }
-
                 startObservingAlerts()
-
                 val updateUser = authRepository.getUserProfile(monitor.id)
                 currentUser = updateUser
             }else {
-                errorMessage = "Erro ao desassociar o protegido."
+                errorMessage = getString(R.string.error_disassociate_protected)
             }
             isLoading = false
         }
     }
 
-    // Buscar a lista de monitores
     fun fetchAssociatedMonitors() {
         val user = currentUser ?: return
-        // Se não for protegido ou não tiver monitores, limpa a lista
         if (!user.isProtected || user.associatedMonitorIds.isEmpty()) {
             associatedMonitors = emptyList()
             return
         }
 
         viewModelScope.launch {
-            // Reutilizamos a função getAssociatedUsers, pois ela serve para qualquer lista de IDs
             val result = firestoreRepository.getAssociatedUsers(user.associatedMonitorIds)
             if (result.isSuccess) {
                 associatedMonitors = result.getOrNull() ?: emptyList()
@@ -340,24 +330,19 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    // Desassociar um Monitor (Ação feita pelo Protegido)
     fun disassociateMonitor(monitorId: String) {
         val protectedUser = currentUser ?: return
         isLoading = true
 
         viewModelScope.launch {
-            // A função removeAssociation pede (monitorId, protectedId).
-            // Aqui somos o protegido, por isso passamos o ID do monitor alvo e o nosso ID.
             val result = firestoreRepository.removeAssociation(monitorId, protectedUser.id)
 
             if (result.isSuccess) {
-                // Atualiza a lista visualmente
                 associatedMonitors = associatedMonitors.filter { it.id != monitorId }
-
                 val updatedUser = authRepository.getUserProfile(protectedUser.id)
                 currentUser = updatedUser
             } else {
-                errorMessage = "Erro ao desassociar o monitor"
+                errorMessage = getString(R.string.error_disassociate_monitor)
             }
             isLoading = false
         }

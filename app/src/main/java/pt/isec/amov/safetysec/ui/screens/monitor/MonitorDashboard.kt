@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.gms.maps.model.LatLng
+import pt.isec.amov.safetysec.R 
 import pt.isec.amov.safetysec.data.model.Rule
 import pt.isec.amov.safetysec.data.model.RuleType
 import pt.isec.amov.safetysec.data.model.User
@@ -35,7 +37,6 @@ fun MonitorDashboard(
     onLogout: () -> Unit,
     onNavigateToProfile: () -> Unit
 ) {
-    // Inicia a escuta de alertas em tempo real ao abrir o ecrã
     LaunchedEffect(Unit) {
         authViewModel.startObservingAlerts()
     }
@@ -45,13 +46,11 @@ fun MonitorDashboard(
     var userParaRemover by remember { mutableStateOf<User?>(null) }
 
     // --- ESTADOS DE GESTÃO DE REGRAS ---
-    var userParaGerirRegras by remember { mutableStateOf<User?>(null) } // Abre a lista de regras
-    var showAddRuleDialog by remember { mutableStateOf(false) }         // Abre o form de criar
-    var ruleToEdit by remember { mutableStateOf<Rule?>(null) }          // Abre o form de editar
-
+    var userParaGerirRegras by remember { mutableStateOf<User?>(null) }
+    var showAddRuleDialog by remember { mutableStateOf(false) }
+    var ruleToEdit by remember { mutableStateOf<Rule?>(null) }
     var showHistoryDialog by remember { mutableStateOf(false) }
 
-    // Quando selecionamos um utilizador para gerir regras, carregamos as regras dele
     LaunchedEffect(userParaGerirRegras) {
         if (userParaGerirRegras != null) {
             monitorViewModel.fetchRulesForProtected(userParaGerirRegras!!.id)
@@ -59,24 +58,23 @@ fun MonitorDashboard(
     }
 
     // =====================================================================
-    // DIÁLOGO: HISTÓRICO GLOBAL DE ALERTAS (NOVO)
+    // DIÁLOGO: HISTÓRICO GLOBAL
     // =====================================================================
     if (showHistoryDialog) {
         AlertDialog(
             onDismissRequest = { showHistoryDialog = false },
-            title = { Text("Histórico Recente (Todos)") },
+            title = { Text(stringResource(R.string.history_all_title)) },
             text = {
                 if (monitorViewModel.monitorAlertHistory.isEmpty()) {
-                    Text("Não existem alertas registados nos seus protegidos.")
+                    Text(stringResource(R.string.no_alerts_monitor))
                 } else {
                     LazyColumn {
                         items(monitorViewModel.monitorAlertHistory) { alert ->
                             val dateFormat = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
                             val dataFormatada = try { dateFormat.format(alert.date) } catch (e: Exception) { "-" }
 
-                            // Tentar descobrir o NOME do protegido através do ID ou Email
                             val nomeProtegido = authViewModel.monitoredUsers.find { it.id == alert.protectedId }?.name
-                                ?: alert.userEmail // Fallback para email se não encontrar nome
+                                ?: alert.userEmail
 
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -84,7 +82,7 @@ fun MonitorDashboard(
                             ) {
                                 ListItem(
                                     headlineContent = {
-                                        // AQUI MOSTRAMOS O NOME DA PESSOA
+                                        // Nome + Tipo de Alerta
                                         Text("$nomeProtegido: ${alert.type.name}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                                     },
                                     supportingContent = {
@@ -102,14 +100,14 @@ fun MonitorDashboard(
                                                 ) {
                                                     Icon(Icons.Default.PlayCircle, null, modifier = Modifier.size(16.dp))
                                                     Spacer(modifier = Modifier.width(4.dp))
-                                                    Text("Ver Vídeo de Prova", fontSize = 12.sp)
+                                                    Text(stringResource(R.string.btn_view_video), fontSize = 12.sp)
                                                 }
                                             }
 
                                             val estado = when {
-                                                alert.cancelled -> "Cancelado"
-                                                alert.solved -> "Resolvido"
-                                                else -> "ATIVO"
+                                                alert.cancelled -> stringResource(R.string.alert_cancelled)
+                                                alert.solved -> stringResource(R.string.alert_solved)
+                                                else -> stringResource(R.string.alert_active).uppercase()
                                             }
                                             val cor = if(!alert.cancelled && !alert.solved) Color.Red else Color.Gray
                                             Text(estado, color = cor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
@@ -130,13 +128,13 @@ fun MonitorDashboard(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showHistoryDialog = false }) { Text("Fechar") }
+                TextButton(onClick = { showHistoryDialog = false }) { Text(stringResource(R.string.btn_close)) }
             }
         )
     }
 
     // =====================================================================
-    // DIÁLOGO PRINCIPAL: LISTA DE REGRAS DO UTILIZADOR
+    // DIÁLOGO: LISTA DE REGRAS
     // =====================================================================
     if (userParaGerirRegras != null && !showAddRuleDialog && ruleToEdit == null) {
         val targetUser = userParaGerirRegras!!
@@ -149,26 +147,25 @@ fun MonitorDashboard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Settings, null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Regras: ${targetUser.name}")
+                    Text(stringResource(R.string.rules_user_title, targetUser.name))
                 }
             },
             text = {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Botão Nova Regra
                     Button(
                         onClick = { showAddRuleDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Add, null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Nova Regra")
+                        Text(stringResource(R.string.btn_new_rule))
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     if (monitorViewModel.currentRules.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Sem regras definidas.", color = Color.Gray)
+                            Text(stringResource(R.string.no_rules_defined), color = Color.Gray)
                         }
                     } else {
                         LazyColumn {
@@ -183,28 +180,35 @@ fun MonitorDashboard(
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(rule.type.name, fontWeight = FontWeight.Bold)
-                                            // Ícones de Ação (Editar / Apagar)
+                                            // Nome Traduzido do Tipo de Regra
+                                            val nomeRegra = when(rule.type) {
+                                                RuleType.CONTROLO_VELOCIDADE -> stringResource(R.string.rule_speed)
+                                                RuleType.INATIVIDADE -> stringResource(R.string.rule_inactivity)
+                                                RuleType.GEOFENCING -> stringResource(R.string.rule_geo)
+                                                RuleType.QUEDA -> stringResource(R.string.rule_fall)
+                                                RuleType.ACIDENTE -> stringResource(R.string.rule_accident)
+                                                else -> rule.type.name
+                                            }
+                                            Text(nomeRegra, fontWeight = FontWeight.Bold)
+
                                             Row {
                                                 IconButton(onClick = {
-                                                    // Carrega dados para edição
                                                     monitorViewModel.ruleValueInput = rule.valueDouble?.toString() ?: ""
                                                     monitorViewModel.ruleDescription = rule.description
                                                     ruleToEdit = rule
                                                 }) {
-                                                    Icon(Icons.Default.Edit, "Editar", tint = MaterialTheme.colorScheme.primary)
+                                                    Icon(Icons.Default.Edit, stringResource(R.string.btn_edit), tint = MaterialTheme.colorScheme.primary)
                                                 }
                                                 IconButton(onClick = { monitorViewModel.deleteRule(rule.id, targetUser.id) }) {
-                                                    Icon(Icons.Default.Delete, "Apagar", tint = MaterialTheme.colorScheme.error)
+                                                    Icon(Icons.Default.Delete, stringResource(R.string.btn_delete), tint = MaterialTheme.colorScheme.error)
                                                 }
                                             }
                                         }
-                                        Text("Valor: ${rule.valueDouble ?: "-"}", style = MaterialTheme.typography.bodyMedium)
+                                        Text("${stringResource(R.string.rule_value_prefix)} ${rule.valueDouble ?: "-"}", style = MaterialTheme.typography.bodyMedium)
                                         Text(rule.description, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
 
-                                        // Estado da Regra
                                         Text(
-                                            if(rule.isActive) "Estado: ATIVA" else "Estado: INATIVA (A aguardar protegido)",
+                                            if(rule.isActive) stringResource(R.string.rule_state_active) else stringResource(R.string.rule_state_inactive),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = if(rule.isActive) Color(0xFF2E7D32) else Color(0xFFEF6C00)
                                         )
@@ -216,7 +220,7 @@ fun MonitorDashboard(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { userParaGerirRegras = null }) { Text("Fechar") }
+                TextButton(onClick = { userParaGerirRegras = null }) { Text(stringResource(R.string.btn_close)) }
             }
         )
     }
@@ -227,67 +231,59 @@ fun MonitorDashboard(
     if (showAddRuleDialog) {
         AlertDialog(
             onDismissRequest = { showAddRuleDialog = false },
-            title = { Text("Nova Regra") },
+            title = { Text(stringResource(R.string.new_rule_title)) },
             text = {
                 Column {
-                    Text("Tipo de Regra:", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.rule_type_label), style = MaterialTheme.typography.labelMedium)
 
-                    // 1. Adicionado scroll horizontal para caberem todas as opções
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()), // Permite deslizar
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Opções existentes
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.CONTROLO_VELOCIDADE,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.CONTROLO_VELOCIDADE },
-                            label = { Text("Velocidade") }
+                            label = { Text(stringResource(R.string.rule_speed)) }
                         )
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.INATIVIDADE,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.INATIVIDADE },
-                            label = { Text("Inatividade") }
+                            label = { Text(stringResource(R.string.rule_inactivity)) }
                         )
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.GEOFENCING,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.GEOFENCING },
-                            label = { Text("Area/Geo") }
+                            label = { Text(stringResource(R.string.rule_geo)) }
                         )
-                        // 2. Novas opções (Queda e Acidente)
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.QUEDA,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.QUEDA },
-                            label = { Text("Queda") }
+                            label = { Text(stringResource(R.string.rule_fall)) }
                         )
                         FilterChip(
                             selected = monitorViewModel.selectedRuleType == RuleType.ACIDENTE,
                             onClick = { monitorViewModel.selectedRuleType = RuleType.ACIDENTE },
-                            label = { Text("Acidente") }
+                            label = { Text(stringResource(R.string.rule_accident)) }
                         )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 3. Lógica para saber se o campo Valor deve estar ativo
-                    // Apenas Velocidade, Inatividade e Geofencing precisam de valor numérico
                     val needsValue = when (monitorViewModel.selectedRuleType) {
                         RuleType.QUEDA, RuleType.ACIDENTE, RuleType.BOTAO_PANICO -> false
                         else -> true
                     }
 
-                    // 4. Campo Valor (Ativo ou Inativo)
                     OutlinedTextField(
-                        value = if (needsValue) monitorViewModel.ruleValueInput else "N/A", // Mostra N/A se inativo
-                        onValueChange = {
-                            if (needsValue) monitorViewModel.ruleValueInput = it
-                        },
+                        value = if (needsValue) monitorViewModel.ruleValueInput else "N/A",
+                        onValueChange = { if (needsValue) monitorViewModel.ruleValueInput = it },
                         label = {
-                            Text(if (needsValue) "Valor (Km/h, Min, Raio)" else "Sem parâmetro necessário")
+                            Text(if (needsValue) stringResource(R.string.rule_value_hint) else stringResource(R.string.rule_no_param))
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        enabled = needsValue, // <--- Aqui bloqueamos o campo
+                        enabled = needsValue,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -297,54 +293,62 @@ fun MonitorDashboard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Campo Descrição (Sempre ativo)
                     OutlinedTextField(
                         value = monitorViewModel.ruleDescription,
                         onValueChange = { monitorViewModel.ruleDescription = it },
-                        label = { Text("Descrição (Opcional)") },
+                        label = { Text(stringResource(R.string.rule_desc_hint)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    // Verificação de segurança
                     if (userParaGerirRegras != null) {
                         monitorViewModel.submitRule(
                             monitorId = authViewModel.currentUser?.id ?: "",
-                            targetUser = userParaGerirRegras!!, // <--- MUDANÇA: Passamos o user objeto
+                            targetUser = userParaGerirRegras!!,
                             onFinished = { showAddRuleDialog = false }
                         )
                     }
-                }) { Text("Criar") }
+                }) { Text(stringResource(R.string.btn_create)) }
             },
             dismissButton = {
-                TextButton(onClick = { showAddRuleDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { showAddRuleDialog = false }) { Text(stringResource(R.string.btn_cancel)) }
             }
         )
     }
+
     // =====================================================================
-    // DIÁLOGO: EDITAR REGRA EXISTENTE
+    // DIÁLOGO: EDITAR REGRA
     // =====================================================================
     if (ruleToEdit != null) {
         AlertDialog(
             onDismissRequest = { ruleToEdit = null },
-            title = { Text("Editar Regra") },
+            title = { Text(stringResource(R.string.edit_rule_title)) },
             text = {
                 Column {
-                    Text("Tipo: ${ruleToEdit!!.type.name}", fontWeight = FontWeight.Bold)
+                    val nomeRegra = when(ruleToEdit!!.type) {
+                        RuleType.CONTROLO_VELOCIDADE -> stringResource(R.string.rule_speed)
+                        RuleType.INATIVIDADE -> stringResource(R.string.rule_inactivity)
+                        RuleType.GEOFENCING -> stringResource(R.string.rule_geo)
+                        RuleType.QUEDA -> stringResource(R.string.rule_fall)
+                        RuleType.ACIDENTE -> stringResource(R.string.rule_accident)
+                        else -> ruleToEdit!!.type.name
+                    }
+                    Text("${stringResource(R.string.rule_type_label)} $nomeRegra", fontWeight = FontWeight.Bold)
+
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = monitorViewModel.ruleValueInput,
                         onValueChange = { monitorViewModel.ruleValueInput = it },
-                        label = { Text("Novo Valor") },
+                        label = { Text(stringResource(R.string.new_value_label)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = monitorViewModel.ruleDescription,
                         onValueChange = { monitorViewModel.ruleDescription = it },
-                        label = { Text("Nova Descrição") }
+                        label = { Text(stringResource(R.string.new_desc_label)) }
                     )
                 }
             },
@@ -357,10 +361,10 @@ fun MonitorDashboard(
                         protectedId = userParaGerirRegras!!.id,
                         onFinished = { ruleToEdit = null }
                     )
-                }) { Text("Guardar") }
+                }) { Text(stringResource(R.string.btn_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { ruleToEdit = null }) { Text("Cancelar") }
+                TextButton(onClick = { ruleToEdit = null }) { Text(stringResource(R.string.btn_cancel)) }
             }
         )
     }
@@ -373,7 +377,7 @@ fun MonitorDashboard(
             onDismissRequest = { userParaMapa = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
             modifier = Modifier.fillMaxSize().padding(16.dp),
-            confirmButton = { Button(onClick = { userParaMapa = null }) { Text("Fechar") } },
+            confirmButton = { Button(onClick = { userParaMapa = null }) { Text(stringResource(R.string.btn_close)) } },
             text = { Box(modifier = Modifier.fillMaxSize()) { MapScreen(userParaMapa!!.second!!.latitude, userParaMapa!!.second!!.longitude, userParaMapa!!.first.name) } }
         )
     }
@@ -381,19 +385,18 @@ fun MonitorDashboard(
     if (userParaRemover != null) {
         AlertDialog(
             onDismissRequest = { userParaRemover = null },
-            title = { Text("Remover Associação") },
-            text = { Text("Tem a certeza que deseja desassociar ${userParaRemover?.name}? Esta ação não pode ser desfeita.") },
+            title = { Text(stringResource(R.string.remove_association_title)) },
+            text = { Text(stringResource(R.string.remove_assoc_confirm_monitor, userParaRemover?.name ?: "")) },
             confirmButton = {
                 Button(
                     onClick = {
-                        // Nota: Usa removeAssociation conforme definido no AuthViewModel anterior
                         authViewModel.disassociateProtected(userParaRemover!!.id)
                         userParaRemover = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Desassociar") }
+                ) { Text(stringResource(R.string.btn_disassociate)) }
             },
-            dismissButton = { TextButton(onClick = { userParaRemover = null }) { Text("Cancelar") } }
+            dismissButton = { TextButton(onClick = { userParaRemover = null }) { Text(stringResource(R.string.btn_cancel)) } }
         )
     }
 
@@ -407,21 +410,19 @@ fun MonitorDashboard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Painel do Monitor", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.monitor_panel_title), style = MaterialTheme.typography.headlineSmall)
             Row {
-
                 IconButton(onClick = {
-                    // Passamos a lista de users que o monitor tem associados para buscar os alertas deles
                     monitorViewModel.fetchMonitorAlertHistory(authViewModel.monitoredUsers)
                     showHistoryDialog = true
                 }) {
-                    Icon(Icons.Default.History, "Histórico Recente")
+                    Icon(Icons.Default.History, stringResource(R.string.recent_history))
                 }
                 IconButton(onClick = onNavigateToProfile) {
-                    Icon(Icons.Default.AccountCircle, "Perfil")
+                    Icon(Icons.Default.AccountCircle, stringResource(R.string.btn_profile))
                 }
                 TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) {
-                    Text("Sair")
+                    Text(stringResource(R.string.btn_logout))
                 }
             }
         }
@@ -440,7 +441,7 @@ fun MonitorDashboard(
                 OutlinedTextField(
                     value = authViewModel.codeInput,
                     onValueChange = { authViewModel.codeInput = it },
-                    label = { Text("Inserir Código OTP") },
+                    label = { Text(stringResource(R.string.insert_otp_label)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
@@ -449,13 +450,14 @@ fun MonitorDashboard(
                     onClick = { authViewModel.onLinkSubmit { /* Sucesso */ } },
                     enabled = !authViewModel.isLoading
                 ) {
-                    Text("Ligar")
+                    Text(stringResource(R.string.btn_link))
                 }
             }
         }
 
         // LISTA PROTEGIDOS
-        Text("Meus Protegidos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+        Text(stringResource(R.string.my_protected_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(authViewModel.monitoredUsers) { protegido ->
                 val alertaVinculado = authViewModel.activeAlerts.find { it.userEmail == protegido.email }
@@ -467,7 +469,6 @@ fun MonitorDashboard(
                         containerColor = if (temAlerta) MaterialTheme.colorScheme.errorContainer
                         else MaterialTheme.colorScheme.surface
                     ),
-                    // MUDANÇA IMPORTANTE: Clicar no cartão agora abre a lista de regras
                     onClick = { userParaGerirRegras = protegido }
                 ) {
                     ListItem(
@@ -477,7 +478,7 @@ fun MonitorDashboard(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Badge(containerColor = if (temAlerta) Color.Red else Color(0xFF4CAF50))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (temAlerta) "EM EMERGÊNCIA" else "Seguro")
+                                Text(if (temAlerta) stringResource(R.string.status_emergency) else stringResource(R.string.status_safe))
                             }
                         },
                         leadingContent = {
@@ -489,7 +490,6 @@ fun MonitorDashboard(
                         },
                         trailingContent = {
                             Row {
-                                // 1. Botão Mapa
                                 IconButton(onClick = {
                                     val lat = alertaVinculado?.latitude ?: protegido.lastLatitude
                                     val lon = alertaVinculado?.longitude ?: protegido.lastLongitude
@@ -497,12 +497,11 @@ fun MonitorDashboard(
                                         userParaMapa = Pair(protegido, LatLng(lat, lon))
                                     }
                                 }) {
-                                    Icon(Icons.Default.LocationOn, "Mapa", tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.outline)
+                                    Icon(Icons.Default.LocationOn, stringResource(R.string.btn_map), tint = if (temAlerta) Color.Red else MaterialTheme.colorScheme.outline)
                                 }
 
-                                // 2. Botão Remover (Lixo)
                                 IconButton(onClick = { userParaRemover = protegido }) {
-                                    Icon(Icons.Default.Delete, "Remover", tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Delete, stringResource(R.string.btn_remove), tint = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }

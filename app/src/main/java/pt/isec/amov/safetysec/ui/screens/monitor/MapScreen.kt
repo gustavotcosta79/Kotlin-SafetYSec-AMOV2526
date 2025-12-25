@@ -3,9 +3,11 @@ package pt.isec.amov.safetysec.ui.screens.monitor
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import pt.isec.amov.safetysec.R
 
 @Composable
 fun MapScreen(latitude: Double, longitude: Double, title: String) {
@@ -21,7 +23,7 @@ fun MapScreen(latitude: Double, longitude: Double, title: String) {
         Marker(
             state = MarkerState(position = location),
             title = title,
-            snippet = "Localização do Protegido"
+            snippet = (stringResource(R.string.protected_location_snippet))
         )
     }
 }

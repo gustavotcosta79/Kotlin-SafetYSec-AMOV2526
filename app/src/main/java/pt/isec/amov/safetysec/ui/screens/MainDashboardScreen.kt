@@ -8,9 +8,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import pt.isec.amov.safetysec.ui.screens.monitor.MonitorDashboard
 import pt.isec.amov.safetysec.ui.screens.protected.ProtectedDashboard
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
+import pt.isec.amov.safetysec.R
 
 @Composable
 fun MainDashboardScreen(authViewModel: AuthViewModel,onNavigateToLogin: () -> Unit,onNavigateToProfile: () -> Unit) {
@@ -48,14 +50,14 @@ fun MainDashboardScreen(authViewModel: AuthViewModel,onNavigateToLogin: () -> Un
                     NavigationBarItem(
                         selected = isMonitorTabSelected,
                         onClick = { isMonitorTabSelected = true },
-                        label = { Text("Monitor") },
-                        icon = { Icon(Icons.Default.Visibility, contentDescription = "Monitor") }
+                        label = { Text(stringResource(R.string.nav_monitor)) },
+                        icon = { Icon(Icons.Default.Visibility, contentDescription = (stringResource(R.string.nav_monitor))) }
                     )
                     NavigationBarItem(
                         selected = !isMonitorTabSelected,
                         onClick = { isMonitorTabSelected = false },
-                        label = { Text("Protegido") },
-                        icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = "Protegido") }
+                        label = { Text(stringResource(R.string.nav_protected)) },
+                        icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = (stringResource(R.string.nav_protected))) }
                     )
                 }
             }

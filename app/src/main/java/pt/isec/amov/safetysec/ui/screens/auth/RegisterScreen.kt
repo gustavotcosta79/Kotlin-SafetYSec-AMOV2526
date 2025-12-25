@@ -6,11 +6,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import pt.isec.amov.safetysec.R
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 
 @Composable
@@ -27,7 +29,7 @@ fun RegisterScreen(
         verticalArrangement = Arrangement.Center
     ){
         Text(
-            text = "Criar Conta",
+            text = stringResource(R.string.register_title),
             style = MaterialTheme.typography.displaySmall,
             color = MaterialTheme.colorScheme.primary
         )
@@ -38,7 +40,7 @@ fun RegisterScreen(
         OutlinedTextField(
             value = viewModel.name,
             onValueChange = { viewModel.name = it },
-            label = { Text("Nome Completo") },
+            label = { Text(stringResource(R.string.name_label)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
@@ -50,7 +52,7 @@ fun RegisterScreen(
         OutlinedTextField(
             value = viewModel.email,
             onValueChange = { viewModel.email = it },
-            label = { Text("Email") },
+            label = { Text(stringResource(R.string.email_label)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
@@ -62,16 +64,20 @@ fun RegisterScreen(
         OutlinedTextField(
             value = viewModel.password,
             onValueChange = { viewModel.password = it },
-            label = { Text("Password") },
+            label = { Text(stringResource(R.string.password_label)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            visualTransformation = PasswordVisualTransformation(), // Esconde a password
+            visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(text = "Selecione o seu perfil:", style = MaterialTheme.typography.labelLarge)
+        // Label de Seleção de Perfil (Adicionei a string nova aqui)
+        Text(
+            text = stringResource(R.string.select_profile_label),
+            style = MaterialTheme.typography.labelLarge
+        )
 
         // Checkbox Monitor
         Row(
@@ -82,7 +88,7 @@ fun RegisterScreen(
                 checked = viewModel.isMonitor,
                 onCheckedChange = { viewModel.isMonitor = it }
             )
-            Text(text = "Monitor (Cuidador)")
+            Text(text = stringResource(R.string.role_monitor))
         }
 
         // Checkbox Protegido
@@ -94,33 +100,33 @@ fun RegisterScreen(
                 checked = viewModel.isProtected,
                 onCheckedChange = { viewModel.isProtected = it }
             )
-            Text(text = "Protegido (Utilizador)")
+            Text(text = stringResource(R.string.role_protected))
         }
 
-        //parte do codigo para cancelar avisos
+        // Parte do código para cancelar avisos
         if (viewModel.isProtected) {
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedTextField(
                 value = viewModel.cancellationCode,
                 onValueChange = {
-                    // Impedir que escreva mais de 4-6 números
                     if (it.length <= 6 && it.all { char -> char.isDigit() }) {
                         viewModel.cancellationCode = it
                     }
                 },
-                label = { Text("Código Cancelamento (PIN)") },
-                placeholder = { Text("Ex: 1234") },
+                label = { Text(stringResource(R.string.cancellation_code_label)) },
+                placeholder = { Text(stringResource(R.string.cancellation_code_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.NumberPassword, //meter p aparecer o numpad
+                    keyboardType = KeyboardType.NumberPassword,
                     imeAction = ImeAction.Done
                 ),
                 visualTransformation = PasswordVisualTransformation()
             )
             Text(
-                text = "* Necessário para cancelar alertas falsos",
+                // CORREÇÃO: Aqui tinhas "password_label", mudei para a nota correta
+                text = stringResource(R.string.cancellation_code_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -128,7 +134,7 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Mensagem de Erro
+        // Mensagem de Erro (Geralmente vem do Firebase, pode ficar assim ou ser mapeada se quiseres muito detalhe)
         if (viewModel.errorMessage != null) {
             Text(
                 text = viewModel.errorMessage!!,
@@ -147,7 +153,7 @@ fun RegisterScreen(
                 onClick = { viewModel.onRegisterClick(onRegisterSuccess) },
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
-                Text("Criar Conta")
+                Text(stringResource(R.string.register_button))
             }
         }
 
@@ -155,7 +161,7 @@ fun RegisterScreen(
 
         // Voltar ao Login
         TextButton(onClick = onNavigateBack) {
-            Text("Já tem conta? Voltar ao Login")
+            Text(stringResource(R.string.has_account_link))
         }
     }
 }

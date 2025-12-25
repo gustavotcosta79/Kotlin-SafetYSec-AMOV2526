@@ -7,6 +7,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import pt.isec.amov.safetysec.R
+
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -29,10 +32,10 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Editar Perfil") },
+                title = { Text((stringResource(R.string.edit_profile_title))) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, (stringResource(R.string.btn_back)))
                     }
                 }
             )
@@ -48,7 +51,7 @@ fun ProfileScreen(
             OutlinedTextField(
                 value = viewModel.editName,
                 onValueChange = { viewModel.editName = it },
-                label = { Text("Nome") },
+                label = { Text(stringResource(R.string.name_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -60,13 +63,13 @@ fun ProfileScreen(
                 OutlinedTextField(
                     value = viewModel.editCancellationCode,
                     onValueChange = { if (it.length <= 6) viewModel.editCancellationCode = it },
-                    label = { Text("Código Cancelamento (PIN)") },
+                    label = { Text(stringResource(R.string.cancellation_code_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
                 )
                 Text(
-                    "Este código é usado para cancelar alertas.",
+                    (stringResource(R.string.pin_help_text)),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                 )
@@ -75,13 +78,13 @@ fun ProfileScreen(
 
             Divider()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Alterar Password (Opcional)", style = MaterialTheme.typography.titleSmall)
+            Text((stringResource(R.string.change_pass_title)), style = MaterialTheme.typography.titleSmall)
 
             // Password
             OutlinedTextField(
                 value = viewModel.editPassword,
                 onValueChange = { viewModel.editPassword = it },
-                label = { Text("Nova Password") },
+                label = { Text(stringResource(R.string.new_pass_label))},
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
@@ -91,7 +94,7 @@ fun ProfileScreen(
             OutlinedTextField(
                 value = viewModel.editConfirmPassword,
                 onValueChange = { viewModel.editConfirmPassword = it },
-                label = { Text("Confirmar Password") },
+                label = { Text(stringResource(R.string.confirm_pass_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
@@ -105,7 +108,7 @@ fun ProfileScreen(
                 Text(viewModel.errorMessage!!, color = MaterialTheme.colorScheme.error)
             }
             if (viewModel.profileUpdateSuccess) {
-                Text("Perfil atualizado com sucesso!", color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.msg_profile_success), color = MaterialTheme.colorScheme.primary)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -118,7 +121,7 @@ fun ProfileScreen(
                 if (viewModel.isLoading) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
                 } else {
-                    Text("Guardar Alterações")
+                    Text(stringResource(R.string.btn_save_changes))
                 }
             }
         }

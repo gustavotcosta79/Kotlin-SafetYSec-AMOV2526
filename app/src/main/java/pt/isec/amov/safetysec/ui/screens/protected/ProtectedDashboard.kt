@@ -4,7 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.view.PreviewView // NOVO IMPORT
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,25 +20,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView // NOVO IMPORT
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import pt.isec.amov.safetysec.R // O R do teu projeto
 import pt.isec.amov.safetysec.data.repository.FirestoreRepository
-import pt.isec.amov.safetysec.managers.CameraManager // NOVO IMPORT
+import pt.isec.amov.safetysec.managers.CameraManager
 import pt.isec.amov.safetysec.managers.LocationManager
 import pt.isec.amov.safetysec.managers.SensorManager
 import pt.isec.amov.safetysec.viewmodel.AuthViewModel
 import pt.isec.amov.safetysec.viewmodel.ProtegidoViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
-import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun ProtectedDashboard(
@@ -48,9 +50,11 @@ fun ProtectedDashboard(
 ) {
     val context = LocalContext.current
     val user = authViewModel.currentUser
+    val application = LocalContext.current.applicationContext as android.app.Application
 
     val protegidoViewModel: ProtegidoViewModel = viewModel(
         factory = ProtegidoViewModel.ProtegidoViewModelFactory(
+            application,
             LocationManager(context),
             SensorManager(context),
             FirestoreRepository()
@@ -58,82 +62,65 @@ fun ProtectedDashboard(
     )
 
     // --- ESTADOS DA UI ---
-    var showCancelDialog by remember { mutableStateOf(false) } // Cancelar Pânico
-    var showMonitorsDialog by remember { mutableStateOf(false) } // Gerir Monitores
-    var showHistoryDialog by remember { mutableStateOf(false) } // Histórico de Alertas
+    var showCancelDialog by remember { mutableStateOf(false) }
+    var showMonitorsDialog by remember { mutableStateOf(false) }
+    var showHistoryDialog by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
 
-    // --- CÂMARA E VIDEO (NOVOS ESTADOS) ---
-    // Inicializamos o CameraManager aqui
+    // --- CÂMARA E VIDEO ---
     val cameraManager = remember { CameraManager(context) }
     var showCameraPreview by remember { mutableStateOf(false) }
     var isUploading by remember { mutableStateOf(false) }
     var isCameraReady by remember { mutableStateOf(false) }
 
-    // Estado para saber qual monitor remover (para confirmação)
     var monitorParaRemover by remember { mutableStateOf<pt.isec.amov.safetysec.data.model.User?>(null) }
 
     // --- ESTADOS DO VIEWMODEL ---
     val isCounting = protegidoViewModel.isCountingDown
     val isAlertSent = protegidoViewModel.activeAlertId != null
     val isInCancelMode = isCounting || isAlertSent
-    var showTimeWindowDialog by remember {mutableStateOf(false)}
+    var showTimeWindowDialog by remember { mutableStateOf(false) }
 
-    // --- CARREGAR DADOS INICIAIS E MONITORIZAÇÃO ---
+    // --- CARREGAMENTO E PERMISSÕES ---
     LaunchedEffect(user) {
         if (user != null) {
-            // 1. Carregar dados do Firestore
             protegidoViewModel.startObservingRules(user.id)
+            protegidoViewModel.startTimeWindowObservation(user.id) // Carregar janelas automaticamente
             authViewModel.fetchAssociatedMonitors()
-
-            protegidoViewModel.startTimeWindowObservation(user.id)
-
-            // 2. Ligar o Motor de Monitorização (GPS + Sensores)
             protegidoViewModel.startAutomaticMonitoring(user)
             protegidoViewModel.startSensorMonitoring(user)
         }
     }
 
-    // --- PERMISSÕES (ATUALIZADO COM A TUA LÓGICA) ---
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { }
 
     LaunchedEffect(Unit) {
-        // 1. Definimos tudo o que a app precisa
         val permissionsNeeded = arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.CAMERA,       // NOVO
-            Manifest.permission.RECORD_AUDIO  // NOVO
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO
         )
-
-        // 2. Filtramos apenas as que AINDA NÃO TEMOS (Mantendo a tua lógica inteligente)
         val permissionsToRequest = permissionsNeeded.filter {
             ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
         }
-
-        // 3. Se a lista de "faltas" não estiver vazia, pedimos ao utilizador
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 
-    //Gatilho para ABRIR A CÂMARA (apenas visualização)
     LaunchedEffect(isAlertSent, isCounting) {
         if (isAlertSent && !isCounting && !showCameraPreview && !isUploading) {
             showCameraPreview = true
-            isCameraReady = false // Reset ao estado
+            isCameraReady = false
         }
     }
 
-    // Gatilho para COMEÇAR A GRAVAR (só quando a câmara estiver pronta)
     LaunchedEffect(showCameraPreview, isCameraReady) {
-        if (showCameraPreview && isCameraReady) { // <--- Só entra aqui se estiver pronta
-
-            // Pequeno delay de segurança para garantir que o preview já tem imagem
+        if (showCameraPreview && isCameraReady) {
             kotlinx.coroutines.delay(500)
-
             cameraManager.recordVideo { videoFile ->
                 showCameraPreview = false
                 isUploading = true
@@ -147,38 +134,32 @@ fun ProtectedDashboard(
     // --- ESTRUTURA PRINCIPAL ---
     Box(modifier = Modifier.fillMaxSize()) {
 
-        // 1. CAMADA DE FUNDO (A Aplicação Normal)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Área do Protegido", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+            // Título Traduzido
+            Text(stringResource(R.string.protected_area_title), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(8.dp))
 
             // --- CABEÇALHO ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-
-                // Botão Perfil
-                IconButton(onClick = onNavigateToProfile) { Icon(Icons.Default.AccountCircle, "Perfil") }
-
-                // Botão Gerir Monitores
-                IconButton(onClick = { authViewModel.fetchAssociatedMonitors(); showMonitorsDialog = true }) { Icon(Icons.Default.Group, "Monitores") }
-
-                // Botão Histórico
-                IconButton(onClick = { if (user != null) { protegidoViewModel.fetchAlertHistory(user.id); showHistoryDialog = true } }) { Icon(Icons.Default.History, "Histórico") }
-
-                //botao para ver as janelas temporais das regras
+                IconButton(onClick = onNavigateToProfile) { Icon(Icons.Default.AccountCircle, stringResource(R.string.btn_profile)) }
+                IconButton(onClick = { authViewModel.fetchAssociatedMonitors(); showMonitorsDialog = true }) { Icon(Icons.Default.Group, stringResource(R.string.btn_monitors)) }
+                IconButton(onClick = { if (user != null) { protegidoViewModel.fetchAlertHistory(user.id); showHistoryDialog = true } }) { Icon(Icons.Default.History, stringResource(R.string.btn_history)) }
                 IconButton(onClick = {
-                    protegidoViewModel.startTimeWindowObservation(user!!.id)
-                    showTimeWindowDialog = true
+                    if (user != null) {
+                        protegidoViewModel.startTimeWindowObservation(user.id)
+                        showTimeWindowDialog = true
+                    }
                 }) {
-                    Icon(Icons.Default.Schedule, "Horários")
+                    Icon(Icons.Default.Schedule, stringResource(R.string.btn_schedules))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) { Text("Sair") }
+                TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) { Text(stringResource(R.string.btn_logout)) }
             }
 
             // MENSAGENS FEEDBACK
@@ -197,7 +178,7 @@ fun ProtectedDashboard(
             // OTP CARD
             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Associação com Monitor", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.association_card_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     authViewModel.connectionCode?.let { code ->
                         Surface(color = MaterialTheme.colorScheme.primary, shape = MaterialTheme.shapes.medium) {
@@ -206,16 +187,16 @@ fun ProtectedDashboard(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { authViewModel.generateCode() }, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (authViewModel.connectionCode == null) "Gerar Novo Código" else "Gerar Outro Código")
+                        Text(if (authViewModel.connectionCode == null) stringResource(R.string.btn_generate_code) else stringResource(R.string.btn_generate_other_code))
                     }
                 }
             }
 
             // LISTA DE REGRAS
-            Text("Regras de Segurança", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start).padding(top = 16.dp))
+            Text(stringResource(R.string.rules_list_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start).padding(top = 16.dp))
 
             if (protegidoViewModel.rules.isEmpty()) {
-                Text("Nenhuma regra definida.", style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp))
+                Text(stringResource(R.string.no_rules_defined), style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp))
             }
 
             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp)) {
@@ -225,7 +206,7 @@ fun ProtectedDashboard(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(regra.type.name, fontWeight = FontWeight.Bold)
                                 Text(regra.description, style = MaterialTheme.typography.bodyMedium)
-                                if (regra.valueDouble != null) Text("Valor: ${regra.valueDouble}", style = MaterialTheme.typography.bodySmall)
+                                if (regra.valueDouble != null) Text("${stringResource(R.string.rule_value_prefix)} ${regra.valueDouble}", style = MaterialTheme.typography.bodySmall)
                             }
                             Switch(checked = regra.isActive, onCheckedChange = { isChecked -> protegidoViewModel.toggleRule(regra.id, isChecked) })
                         }
@@ -255,51 +236,59 @@ fun ProtectedDashboard(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(32.dp))
                         Text(
-                            text = when { isCounting -> "A ENVIAR EM ${protegidoViewModel.countdownValue}s..."; isAlertSent -> "CANCELAR ALERTA"; else -> "BOTÃO DE PÂNICO" },
+                            text = when {
+                                isCounting -> stringResource(R.string.sending_in, protegidoViewModel.countdownValue)
+                                isAlertSent -> stringResource(R.string.cancel_alert_caps)
+                                else -> stringResource(R.string.panic_button)
+                            },
                             fontSize = if (isCounting) 24.sp else 22.sp, fontWeight = FontWeight.Black
                         )
-                        if (isInCancelMode) Text(if (isCounting) "Toque para abortar" else "Modo SOS Ativo", fontSize = 14.sp)
+                        if (isInCancelMode) Text(if (isCounting) stringResource(R.string.tap_to_abort) else stringResource(R.string.sos_mode_active), fontSize = 14.sp)
                     }
                 }
             }
         }
 
         // =========================================================
-        // DIÁLOGOS EXISTENTES (Monitores, Remover, Histórico, PIN)
+        // DIÁLOGOS
         // =========================================================
 
         if (showMonitorsDialog) {
             AlertDialog(
                 onDismissRequest = { showMonitorsDialog = false },
-                title = { Text("Meus Monitores") },
+                title = { Text(stringResource(R.string.my_monitors_title)) },
                 text = {
-                    if (authViewModel.associatedMonitors.isEmpty()) Text("Não está associado a nenhum monitor.")
-                    else LazyColumn { items(authViewModel.associatedMonitors) { monitor -> ListItem(leadingContent = { Icon(Icons.Default.Person, null) }, headlineContent = { Text(monitor.name) }, trailingContent = { IconButton(onClick = { monitorParaRemover = monitor }) { Icon(Icons.Default.Delete, "Remover", tint = MaterialTheme.colorScheme.error) } }); HorizontalDivider() } }
+                    if (authViewModel.associatedMonitors.isEmpty()) Text(stringResource(R.string.no_monitors_associated))
+                    else LazyColumn { items(authViewModel.associatedMonitors) { monitor -> ListItem(leadingContent = { Icon(Icons.Default.Person, null) }, headlineContent = { Text(monitor.name) }, trailingContent = { IconButton(onClick = { monitorParaRemover = monitor }) { Icon(Icons.Default.Delete, stringResource(R.string.btn_remove), tint = MaterialTheme.colorScheme.error) } }); HorizontalDivider() } }
                 },
-                confirmButton = { TextButton(onClick = { showMonitorsDialog = false }) { Text("Fechar") } }
+                confirmButton = { TextButton(onClick = { showMonitorsDialog = false }) { Text(stringResource(R.string.btn_close)) } }
             )
         }
 
         if (monitorParaRemover != null) {
             AlertDialog(
                 onDismissRequest = { monitorParaRemover = null },
-                title = { Text("Remover associação?") },
-                text = { Text("Tem a certeza que deseja se desassociar de ${monitorParaRemover?.name}?") },
-                confirmButton = { Button(onClick = { authViewModel.disassociateMonitor(monitorParaRemover!!.id); monitorParaRemover = null }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Desassociar") } },
-                dismissButton = { TextButton(onClick = { monitorParaRemover = null }) { Text("Cancelar") } }
+                title = { Text(stringResource(R.string.remove_association_title)) },
+                text = { Text(stringResource(R.string.remove_association_confirm, monitorParaRemover?.name ?: "")) },
+                confirmButton = { Button(onClick = { authViewModel.disassociateMonitor(monitorParaRemover!!.id); monitorParaRemover = null }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.btn_disassociate)) } },
+                dismissButton = { TextButton(onClick = { monitorParaRemover = null }) { Text(stringResource(R.string.btn_cancel)) } }
             )
         }
 
         if (showHistoryDialog) {
             AlertDialog(
                 onDismissRequest = { showHistoryDialog = false },
-                title = { Text("Histórico de Alertas") },
+                title = { Text(stringResource(R.string.history_title)) },
                 text = {
-                    if (protegidoViewModel.alertHistory.isEmpty()) Text("Ainda não existem alertas registados.")
+                    if (protegidoViewModel.alertHistory.isEmpty()) Text(stringResource(R.string.no_alerts_history))
                     else LazyColumn { items(protegidoViewModel.alertHistory) { alert ->
                         val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-                        val dataFormatada = try { dateFormat.format(alert.date) } catch (e: Exception) { "Data desconhecida" }
-                        val estado = when { alert.cancelled -> "Cancelado"; alert.solved -> "Resolvido"; else -> "Ativo / Pendente" }
+                        val dataFormatada = try { dateFormat.format(alert.date) } catch (e: Exception) { "-" }
+                        val estado = when {
+                            alert.cancelled -> stringResource(R.string.alert_cancelled)
+                            alert.solved -> stringResource(R.string.alert_solved)
+                            else -> stringResource(R.string.alert_active)
+                        }
                         val corEstado = when { alert.cancelled -> Color.Gray; alert.solved -> Color(0xFF2E7D32); else -> Color.Red }
                         val icon = when { alert.cancelled -> Icons.Default.Close; alert.solved -> Icons.Default.CheckCircle; else -> Icons.Default.Warning }
                         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -308,7 +297,7 @@ fun ProtectedDashboard(
                         HorizontalDivider()
                     }}
                 },
-                confirmButton = { TextButton(onClick = { showHistoryDialog = false }) { Text("Fechar") } }
+                confirmButton = { TextButton(onClick = { showHistoryDialog = false }) { Text(stringResource(R.string.btn_close)) } }
             )
         }
 
@@ -316,16 +305,16 @@ fun ProtectedDashboard(
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).zIndex(2f).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { showCancelDialog = false }, contentAlignment = Alignment.Center) {
                 Card(modifier = Modifier.fillMaxWidth(0.9f).clickable(enabled = false) {}, colors = CardDefaults.cardColors(containerColor = Color(0xFFEEEEEE)), elevation = CardDefaults.cardElevation(8.dp)) {
                     Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Cancelar Emergência", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text(stringResource(R.string.cancel_emergency_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Introduza o seu PIN para cancelar.", color = Color.Black)
+                        Text(stringResource(R.string.enter_pin_text), color = Color.Black)
                         Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedTextField(value = pinInput, onValueChange = { if (it.length <= 6) pinInput = it }, label = { Text("PIN") }, singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black), visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = pinInput, onValueChange = { if (it.length <= 6) pinInput = it }, label = { Text(stringResource(R.string.pin_label)) }, singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black), visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            TextButton(onClick = { showCancelDialog = false }) { Text("Voltar") }
+                            TextButton(onClick = { showCancelDialog = false }) { Text(stringResource(R.string.btn_back)) }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Button(onClick = { if (user != null) { protegidoViewModel.handleCancelRequest(pinInput, user.cancellationCode); showCancelDialog = false } }) { Text("Confirmar") }
+                            Button(onClick = { if (user != null) { protegidoViewModel.handleCancelRequest(pinInput, user.cancellationCode); showCancelDialog = false } }) { Text(stringResource(R.string.btn_confirm)) }
                         }
                     }
                 }
@@ -333,7 +322,7 @@ fun ProtectedDashboard(
         }
 
         // =========================================================
-        // CÂMARA OVERLAY (Aparece automaticamente)
+        // CÂMARA OVERLAY
         // =========================================================
         if (showCameraPreview) {
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -341,9 +330,8 @@ fun ProtectedDashboard(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black)
-                    .zIndex(3f) // Fica por cima de tudo
+                    .zIndex(3f)
             ) {
-                // Componente que mostra a imagem da câmara
                 AndroidView(
                     factory = { ctx ->
                         val previewView = PreviewView(ctx)
@@ -351,16 +339,13 @@ fun ProtectedDashboard(
                         cameraManager.startCamera(
                             lifecycleOwner = lifecycleOwner,
                             surfaceProvider = previewView.surfaceProvider,
-                            onCameraReady = {
-                                isCameraReady = true
-                            }
+                            onCameraReady = { isCameraReady = true }
                         )
                         previewView
                     },
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Interface sobreposta (Botão Parar)
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -368,7 +353,7 @@ fun ProtectedDashboard(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        "A GRAVAR PROVAS...",
+                        stringResource(R.string.recording_proof),
                         color = Color.Red,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp,
@@ -376,17 +361,17 @@ fun ProtectedDashboard(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
-                        onClick = { cameraManager.stopRecording() }, // Parar manual (o automático também funciona a 30s)
+                        onClick = { cameraManager.stopRecording() },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                     ) {
-                        Text("Parar e Enviar Agora")
+                        Text(stringResource(R.string.stop_send_now))
                     }
                 }
             }
         }
 
         // =========================================================
-        // LOADING OVERLAY (Enquanto faz upload)
+        // LOADING OVERLAY
         // =========================================================
         if (isUploading) {
             Box(
@@ -399,33 +384,31 @@ fun ProtectedDashboard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("A enviar vídeo para o Monitor...", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Por favor aguarde.", color = Color.Gray, fontSize = 12.sp)
+                    Text(stringResource(R.string.sending_video_monitor), color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.please_wait), color = Color.Gray, fontSize = 12.sp)
                 }
             }
         }
     }
 
     // =========================================================
-    // DIÁLOGO DE GESTÃO DE HORÁRIOS (TIME WINDOWS)
+    // DIÁLOGO DE HORÁRIOS
     // =========================================================
     if (showTimeWindowDialog) {
         var newName by remember { mutableStateOf("") }
         var startH by remember { mutableStateOf("09") }
         var endH by remember { mutableStateOf("18") }
-        // Dias: Dom, Seg, Ter, Qua, Qui, Sex, Sab
         val days = remember { mutableStateListOf(false, true, true, true, true, true, false) }
         val dayNames = listOf("D", "S", "T", "Q", "Q", "S", "S")
 
         AlertDialog(
             onDismissRequest = { showTimeWindowDialog = false },
-            title = { Text("Janelas de Monitorização") },
+            title = { Text(stringResource(R.string.monitoring_windows_title)) },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("Defina quando quer ser monitorizado. Se a lista estiver vazia, será monitorizado 24h.", fontSize = 12.sp, color = Color.Gray)
+                    Text(stringResource(R.string.monitoring_windows_desc), fontSize = 12.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // LISTA DE JANELAS EXISTENTES
                     LazyColumn(modifier = Modifier.heightIn(max = 150.dp)) {
                         items(protegidoViewModel.timeWindows) { window ->
                             Row(
@@ -438,7 +421,7 @@ fun ProtectedDashboard(
                                     Text("${window.startHour}:00 - ${window.endHour}:00", fontSize = 12.sp)
                                 }
                                 IconButton(onClick = { if (user != null) protegidoViewModel.deleteTimeWindow(user.id, window.id) }) {
-                                    Icon(Icons.Default.Delete, "Apagar", tint = Color.Red)
+                                    Icon(Icons.Default.Delete, stringResource(R.string.btn_delete), tint = Color.Red)
                                 }
                             }
                             HorizontalDivider()
@@ -446,30 +429,27 @@ fun ProtectedDashboard(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Adicionar Novo Horário:", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.add_new_schedule), fontWeight = FontWeight.Bold)
 
                     OutlinedTextField(
                         value = newName,
                         onValueChange = { newName = it },
-                        label = { Text("Nome (ex: Trabalho)") },
+                        label = { Text(stringResource(R.string.schedule_name_hint)) },
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        OutlinedTextField(value = startH, onValueChange = { startH = it }, label = { Text("Início (H)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                        OutlinedTextField(value = startH, onValueChange = { startH = it }, label = { Text(stringResource(R.string.start_h)) }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                         Spacer(modifier = Modifier.width(8.dp))
-                        OutlinedTextField(value = endH, onValueChange = { endH = it }, label = { Text("Fim (H)") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                        OutlinedTextField(value = endH, onValueChange = { endH = it }, label = { Text(stringResource(R.string.end_h)) }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                     }
 
-                    Text("Dias da Semana:", modifier = Modifier.padding(top=8.dp))
+                    Text(stringResource(R.string.days_of_week), modifier = Modifier.padding(top=8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         dayNames.forEachIndexed { index, name ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(name, fontSize = 10.sp)
-                                Checkbox(
-                                    checked = days[index],
-                                    onCheckedChange = { days[index] = it }
-                                )
+                                Checkbox(checked = days[index], onCheckedChange = { days[index] = it })
                             }
                         }
                     }
@@ -480,19 +460,14 @@ fun ProtectedDashboard(
                     if (newName.isNotEmpty() && user != null) {
                         val s = startH.toIntOrNull() ?: 9
                         val e = endH.toIntOrNull() ?: 18
-                        val newWindow = pt.isec.amov.safetysec.data.model.TimeWindow(
-                            name = newName,
-                            startHour = s,
-                            endHour = e,
-                            activeDays = days.toList()
-                        )
+                        val newWindow = pt.isec.amov.safetysec.data.model.TimeWindow(name = newName, startHour = s, endHour = e, activeDays = days.toList())
                         protegidoViewModel.addTimeWindow(user.id, newWindow)
-                        newName = "" // Reset
+                        newName = ""
                     }
-                }) { Text("Adicionar") }
+                }) { Text(stringResource(R.string.btn_add)) }
             },
             dismissButton = {
-                TextButton(onClick = { showTimeWindowDialog = false }) { Text("Fechar") }
+                TextButton(onClick = { showTimeWindowDialog = false }) { Text(stringResource(R.string.btn_close)) }
             }
         )
     }

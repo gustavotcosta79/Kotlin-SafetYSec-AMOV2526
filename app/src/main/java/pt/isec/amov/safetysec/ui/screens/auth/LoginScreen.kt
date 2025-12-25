@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import pt.isec.amov.safetysec.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,7 +46,7 @@ fun LoginScreen (
         OutlinedTextField(
             value = viewModel.email,
             onValueChange = { viewModel.email = it },
-            label = { Text("Email") },
+            label = { Text(stringResource(R.string.email_label)) },
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
@@ -59,7 +61,7 @@ fun LoginScreen (
         OutlinedTextField(
             value = viewModel.password,
             onValueChange = { viewModel.password = it },
-            label = { Text("Password") },
+            label = { Text(stringResource(R.string.password_label)) },
             modifier = Modifier.fillMaxWidth(),
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
@@ -94,7 +96,7 @@ fun LoginScreen (
                 onClick = { viewModel.onLoginClick(onLoginSuccess) },
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
-                Text("Entrar")
+                Text(stringResource(R.string.login_button))
             }
         }
 
@@ -102,7 +104,7 @@ fun LoginScreen (
 
         // Botão para ir para o Registo
         TextButton(onClick = onNavigateToRegister) {
-            Text("Ainda não tem conta? Registe-se aqui.")
+            Text(stringResource(R.string.no_account_link))
         }
     }
 }
