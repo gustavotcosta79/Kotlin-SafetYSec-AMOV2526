@@ -337,12 +337,4 @@ class ProtegidoViewModel(
         }
     }
 
-    // Construtor auxiliar para compatibilidade com o ProtectedDashboard antigo
-    // (Caso não queiras mudar o Dashboard agora, usamos este truque)
-    // Mas o ideal é mudar a chamada no Dashboard.
-    constructor(
-        locationManager: LocationManager,
-        sensorManager: SensorManager,
-        firestoreRepository: FirestoreRepository
-    ) : this(android.app.Application(), locationManager, sensorManager, firestoreRepository)
 }

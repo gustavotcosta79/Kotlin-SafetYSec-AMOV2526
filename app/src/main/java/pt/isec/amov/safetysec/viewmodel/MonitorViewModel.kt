@@ -54,10 +54,12 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun fetchRulesForProtected(protectedId: String) {
+    // MUDANÇA: Adicionado parâmetro monitorId
+    fun fetchRulesForProtected(protectedId: String, monitorId: String) {
         isLoading = true
         viewModelScope.launch {
-            val result = repository.getRulesForUser(protectedId)
+            // Passamos o monitorId para o repositório
+            val result = repository.getRulesForUser(protectedId, monitorId)
             if (result.isSuccess) {
                 currentRules = result.getOrNull() ?: emptyList()
             }
@@ -65,16 +67,16 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Apagar regra
-    fun deleteRule(ruleId: String, protectedId: String) {
+    // MUDANÇA: Adicionado parâmetro monitorId para poder recarregar a lista no fim
+    fun deleteRule(ruleId: String, protectedId: String, monitorId: String) {
         viewModelScope.launch {
             repository.deleteRule(ruleId)
-            fetchRulesForProtected(protectedId)
+            fetchRulesForProtected(protectedId, monitorId) // Recarrega filtrado
         }
     }
 
-    // Editar regra
-    fun updateRule(ruleId: String, newValue: String, newDesc: String, protectedId: String, onFinished: () -> Unit) {
+    // MUDANÇA: Adicionado parâmetro monitorId
+    fun updateRule(ruleId: String, newValue: String, newDesc: String, protectedId: String, monitorId: String, onFinished: () -> Unit) {
         val valueDouble = newValue.toDoubleOrNull()
         val updates = mapOf(
             "valueDouble" to (valueDouble ?: 0.0),
@@ -83,7 +85,7 @@ class MonitorViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             repository.updateRule(ruleId, updates)
-            fetchRulesForProtected(protectedId)
+            fetchRulesForProtected(protectedId, monitorId) // Recarrega filtrado
             onFinished()
         }
     }

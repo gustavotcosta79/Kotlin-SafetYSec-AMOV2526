@@ -155,4 +155,14 @@
     <string name="msg_recovery_email_sent">Email de recuperação enviado! Verifique a caixa de entrada.</string>
     <string name="error_email_required">Introduza o seu email.</string>
     <string name="error_recovery_failed">Falha ao enviar email de recuperação.</string>
+
+    <string name="filter_rules_label">Filtrar Regras por Monitor:</string>
+    <string name="all_monitors_option">Todos os Monitores</string>
+    <string name="no_rules_found">Nenhuma regra encontrada.</string>
+
+    <string name="panic_sending_in">A ENVIAR EM %1$ds...</string>
+
+    <string name="btn_new_code">Novo Código</string>
+    <string name="association_code_title">Código de Associação</string>
+
 </resources>

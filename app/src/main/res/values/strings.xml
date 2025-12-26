@@ -155,4 +155,14 @@
     <string name="msg_recovery_email_sent">Recovery email sent! Check your inbox.</string>
     <string name="error_email_required">Please enter your email.</string>
     <string name="error_recovery_failed">Failed to send recovery email.</string>
+
+    <string name="filter_rules_label">Filter Rules by Monitor:</string>
+    <string name="all_monitors_option">All Monitors</string>
+    <string name="no_rules_found">No rules found.</string>
+
+    <string name="panic_sending_in">SENDING IN %1$ds...</string>
+
+    <string name="btn_new_code">New Code</string>
+    <string name="association_code_title">Association Code</string>
+
 </resources>

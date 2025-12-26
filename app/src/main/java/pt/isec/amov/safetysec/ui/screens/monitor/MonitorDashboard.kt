@@ -53,7 +53,12 @@ fun MonitorDashboard(
 
     LaunchedEffect(userParaGerirRegras) {
         if (userParaGerirRegras != null) {
-            monitorViewModel.fetchRulesForProtected(userParaGerirRegras!!.id)
+            // 1. Obtemos o ID do monitor que está logado
+            val currentMonitorId = authViewModel.currentUser?.id ?: ""
+            // 2. Passamos o ID do protegido E o ID do monitor
+            if (currentMonitorId.isNotBlank()) {
+                monitorViewModel.fetchRulesForProtected(userParaGerirRegras!!.id, currentMonitorId)
+            }
         }
     }
 
@@ -199,7 +204,14 @@ fun MonitorDashboard(
                                                 }) {
                                                     Icon(Icons.Default.Edit, stringResource(R.string.btn_edit), tint = MaterialTheme.colorScheme.primary)
                                                 }
-                                                IconButton(onClick = { monitorViewModel.deleteRule(rule.id, targetUser.id) }) {
+                                                IconButton(onClick = {
+                                                    // MUDANÇA: Adicionado o 3º argumento (ID do Monitor)
+                                                    monitorViewModel.deleteRule(
+                                                        rule.id,
+                                                        targetUser.id,
+                                                        authViewModel.currentUser?.id ?: ""
+                                                    )
+                                                }) {
                                                     Icon(Icons.Default.Delete, stringResource(R.string.btn_delete), tint = MaterialTheme.colorScheme.error)
                                                 }
                                             }
@@ -359,6 +371,10 @@ fun MonitorDashboard(
                         newValue = monitorViewModel.ruleValueInput,
                         newDesc = monitorViewModel.ruleDescription,
                         protectedId = userParaGerirRegras!!.id,
+
+                        // MUDANÇA: Adicionada esta linha
+                        monitorId = authViewModel.currentUser?.id ?: "",
+
                         onFinished = { ruleToEdit = null }
                     )
                 }) { Text(stringResource(R.string.btn_save)) }

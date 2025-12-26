@@ -182,11 +182,12 @@ class FirestoreRepository {
     }
 
 
-    // Função para ler as regras de um Protegido específico
-    suspend fun getRulesForUser(protectedId: String): Result<List<Rule>> {
+    // Função para ler as regras de um Protegido específico (CRIADAS PELO MONITOR X)
+    suspend fun getRulesForUser(protectedId: String, monitorId: String): Result<List<Rule>> {
         return try {
             val snapshot = db.collection("rules")
                 .whereEqualTo("protectedId", protectedId)
+                .whereEqualTo("monitorId", monitorId) // <--- O FILTRO MÁGICO
                 .get()
                 .await()
 
