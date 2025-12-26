@@ -1,6 +1,8 @@
 package pt.isec.amov.safetysec.ui.screens.profile
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState // <--- IMPORTANTE
+import androidx.compose.foundation.verticalScroll     // <--- IMPORTANTE
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -29,13 +31,16 @@ fun ProfileScreen(
 
     val user = viewModel.currentUser ?: return
 
+    // 1. Criamos o estado do scroll
+    val scrollState = rememberScrollState()
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text((stringResource(R.string.edit_profile_title))) },
+                title = { Text(stringResource(R.string.edit_profile_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, (stringResource(R.string.btn_back)))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.btn_back))
                     }
                 }
             )
@@ -46,6 +51,7 @@ fun ProfileScreen(
                 .padding(padding)
                 .padding(16.dp)
                 .fillMaxSize()
+                .verticalScroll(scrollState) // 2. Adicionamos o scroll aqui
         ) {
             // Nome
             OutlinedTextField(
@@ -69,7 +75,7 @@ fun ProfileScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
                 )
                 Text(
-                    (stringResource(R.string.pin_help_text)),
+                    stringResource(R.string.pin_help_text),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                 )
@@ -78,7 +84,7 @@ fun ProfileScreen(
 
             Divider()
             Spacer(modifier = Modifier.height(16.dp))
-            Text((stringResource(R.string.change_pass_title)), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.change_pass_title), style = MaterialTheme.typography.titleSmall)
 
             // Password
             OutlinedTextField(
@@ -124,6 +130,9 @@ fun ProfileScreen(
                     Text(stringResource(R.string.btn_save_changes))
                 }
             }
+
+            // Espaço extra no fundo para garantir visibilidade com teclado
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

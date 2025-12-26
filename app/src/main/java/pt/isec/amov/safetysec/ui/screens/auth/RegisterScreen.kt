@@ -1,6 +1,8 @@
 package pt.isec.amov.safetysec.ui.screens.auth
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState // <--- IMPORTANTE
+import androidx.compose.foundation.verticalScroll     // <--- IMPORTANTE
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,10 +23,14 @@ fun RegisterScreen(
     onNavigateBack: () -> Unit,
     viewModel: AuthViewModel = viewModel()
 ) {
+    // 1. Criamos o estado do scroll
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(scrollState), // 2. Adicionamos o scroll aqui
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ){
@@ -73,7 +79,7 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Label de Seleção de Perfil (Adicionei a string nova aqui)
+        // Label de Seleção de Perfil
         Text(
             text = stringResource(R.string.select_profile_label),
             style = MaterialTheme.typography.labelLarge
@@ -125,7 +131,6 @@ fun RegisterScreen(
                 visualTransformation = PasswordVisualTransformation()
             )
             Text(
-                // CORREÇÃO: Aqui tinhas "password_label", mudei para a nota correta
                 text = stringResource(R.string.cancellation_code_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline
@@ -134,7 +139,7 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Mensagem de Erro (Geralmente vem do Firebase, pode ficar assim ou ser mapeada se quiseres muito detalhe)
+        // Mensagem de Erro
         if (viewModel.errorMessage != null) {
             Text(
                 text = viewModel.errorMessage!!,
@@ -163,5 +168,8 @@ fun RegisterScreen(
         TextButton(onClick = onNavigateBack) {
             Text(stringResource(R.string.has_account_link))
         }
+
+        // Espaço extra no final para garantir que o último botão não fica colado à navegação do sistema
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
