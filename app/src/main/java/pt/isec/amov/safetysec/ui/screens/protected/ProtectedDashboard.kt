@@ -215,47 +215,31 @@ fun ProtectedDashboard(
                 modifier = Modifier.fillMaxSize().padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // 1. Cabeçalho e Título
                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Cabeçalho
+                // 2. Barra de Ferramentas (Profile, Monitors, History, etc.)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onNavigateToProfile) { Icon(Icons.Default.AccountCircle, stringResource(R.string.btn_profile)) }
                     IconButton(onClick = { authViewModel.fetchAssociatedMonitors(); showMonitorsDialog = true }) { Icon(Icons.Default.Group, stringResource(R.string.btn_monitors)) }
                     IconButton(onClick = { if (user != null) { protegidoViewModel.fetchAlertHistory(user.id); showHistoryDialog = true } }) { Icon(Icons.Default.History, stringResource(R.string.btn_history)) }
+                    IconButton(onClick = { if (user != null) showTimeWindowDialog = true }) { Icon(Icons.Default.Schedule, stringResource(R.string.btn_schedules)) }
 
-                    // Botão Janelas Temporais
-                    IconButton(onClick = {
-                        if (user != null) {
-                            // protegidoViewModel.startTimeWindowObservation(user.id) // Descomentar se tiveres
-                            showTimeWindowDialog = true
-                        }
-                    }) {
-                        Icon(Icons.Default.Schedule, stringResource(R.string.btn_schedules))
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.weight(1f))
                     TextButton(onClick = { authViewModel.onLogoutClick { onLogout() } }) { Text(stringResource(R.string.btn_logout)) }
                 }
 
-                // Feedback
-                if (protegidoViewModel.successMessage != null) {
-                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFD4EDDA))) {
-                        Text(protegidoViewModel.successMessage!!, modifier = Modifier.padding(16.dp), color = Color(0xFF155724))
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                if (protegidoViewModel.errorMessage != null) {
-                    Text(protegidoViewModel.errorMessage!!, color = MaterialTheme.colorScheme.error)
+                // 3. Feedback e OTP
+                if (protegidoViewModel.successMessage != null || protegidoViewModel.errorMessage != null) {
+                    // ... (teu código de feedback existente)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-
-                // Card OTP
                 OtpCard(authViewModel)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Dropdown de Filtro (NOVO)
+                // 4. Filtro de Monitor
                 Text(stringResource(R.string.filter_rules_label), style = MaterialTheme.typography.labelMedium, modifier = Modifier.align(Alignment.Start))
                 MonitorFilterDropdown(
                     monitors = authViewModel.associatedMonitors,
@@ -265,12 +249,17 @@ fun ProtectedDashboard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Lista de Regras
-                RulesList(filteredRules, protegidoViewModel)
+                // =========================================================
+                // ALTERAÇÃO PRINCIPAL: Peso na Lista de Regras
+                // =========================================================
+                Box(modifier = Modifier.weight(1f)) { // Envolvemos a lista num Box com weight
+                    RulesList(filteredRules, protegidoViewModel)
+                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                // 5. Espaço mínimo entre a lista e o botão
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Botão de Pânico
+                // 6. Botão de Pânico (Ficará sempre no fundo devido ao weight acima)
                 PanicButton(
                     isCounting = isCounting,
                     isAlertSent = isAlertSent,
@@ -283,6 +272,7 @@ fun ProtectedDashboard(
                     }
                 )
             }
+
         }
 
         // =========================================================
