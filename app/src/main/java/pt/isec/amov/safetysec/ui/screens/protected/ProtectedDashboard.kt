@@ -62,10 +62,10 @@ fun ProtectedDashboard(
 
     val protegidoViewModel: ProtegidoViewModel = viewModel(
         factory = ProtegidoViewModel.ProtegidoViewModelFactory(
-            application,          // <--- 1º: Application
-            LocationManager(context), // <--- 2º: LocationManager
-            SensorManager(context),   // <--- 3º: SensorManager
-            FirestoreRepository()     // <--- 4º: Repository
+            application,
+            LocationManager(context),
+            SensorManager(context),
+            FirestoreRepository()
         )
     )
 
@@ -93,10 +93,9 @@ fun ProtectedDashboard(
     var showTimeWindowDialog by remember { mutableStateOf(false) }
 
     // LÓGICA DE FILTRAGEM DAS REGRAS
-    // Recalcula a lista sempre que as regras ou o filtro mudarem
     val filteredRules = remember(protegidoViewModel.rules, selectedMonitorFilter) {
         if (selectedMonitorFilter == null) {
-            protegidoViewModel.rules // Mostra todas
+            protegidoViewModel.rules
         } else {
             protegidoViewModel.rules.filter { it.monitorId == selectedMonitorFilter?.id }
         }
@@ -106,13 +105,11 @@ fun ProtectedDashboard(
     LaunchedEffect(user) {
         if (user != null) {
             protegidoViewModel.startObservingRules(user.id)
-            // Se tiveres implementado as janelas temporais:
+            // JANELAS TEMPORAIS
             protegidoViewModel.startTimeWindowObservation(user.id)
             authViewModel.fetchAssociatedMonitors()
             protegidoViewModel.startAutomaticMonitoring(user)
             protegidoViewModel.startSensorMonitoring(user)
-
-
         }
     }
 
@@ -221,7 +218,7 @@ fun ProtectedDashboard(
                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // 2. Barra de Ferramentas (Profile, Monitors, History, etc.)
+                // 2. Barra de Ferramentas
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onNavigateToProfile) { Icon(Icons.Default.AccountCircle, stringResource(R.string.btn_profile)) }
                     IconButton(onClick = { authViewModel.fetchAssociatedMonitors(); showMonitorsDialog = true }) { Icon(Icons.Default.Group, stringResource(R.string.btn_monitors)) }
@@ -234,7 +231,14 @@ fun ProtectedDashboard(
 
                 // 3. Feedback e OTP
                 if (protegidoViewModel.successMessage != null || protegidoViewModel.errorMessage != null) {
-                    // ... (teu código de feedback existente)
+                    if (protegidoViewModel.successMessage != null) {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFD4EDDA))) {
+                            Text(protegidoViewModel.successMessage!!, modifier = Modifier.padding(16.dp), color = Color(0xFF155724))
+                        }
+                    }
+                    if (protegidoViewModel.errorMessage != null) {
+                        Text(protegidoViewModel.errorMessage!!, color = MaterialTheme.colorScheme.error)
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 OtpCard(authViewModel)
@@ -251,17 +255,14 @@ fun ProtectedDashboard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // =========================================================
-                // ALTERAÇÃO PRINCIPAL: Peso na Lista de Regras
-                // =========================================================
-                Box(modifier = Modifier.weight(1f)) { // Envolvemos a lista num Box com weight
+                // 5. Lista de Regras (Com peso para empurrar o botão)
+                Box(modifier = Modifier.weight(1f)) {
                     RulesList(filteredRules, protegidoViewModel)
                 }
 
-                // 5. Espaço mínimo entre a lista e o botão
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 6. Botão de Pânico (Ficará sempre no fundo devido ao weight acima)
+                // 6. Botão de Pânico
                 PanicButton(
                     isCounting = isCounting,
                     isAlertSent = isAlertSent,
@@ -328,7 +329,6 @@ fun ProtectedDashboard(
             )
         }
 
-        // Diálogo OTP (Usado principalmente em Landscape)
         if (showOtpDialog) {
             AlertDialog(
                 onDismissRequest = { showOtpDialog = false },
@@ -351,7 +351,8 @@ fun ProtectedDashboard(
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { showCancelDialog = false }) { Text(stringResource(R.string.btn_back)) }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Button(onClick = { if (user != null) { protegidoViewModel.handleCancelRequest(pinInput, user.cancellationCode); showCancelDialog = false } }) { Text(stringResource(R.string.btn_confirm)) }
+                            // MUDANÇA: Passamos user.id para cancelar TODOS os alertas
+                            Button(onClick = { if (user != null) { protegidoViewModel.handleCancelRequest(pinInput, user.cancellationCode, user.id); showCancelDialog = false } }) { Text(stringResource(R.string.btn_confirm)) }
                         }
                     }
                 }
@@ -406,15 +407,11 @@ fun ProtectedDashboard(
 
     // --- JANELAS TEMPORAIS (Dialog) ---
     if (showTimeWindowDialog) {
-        // Estados locais do formulário
         var newName by remember { mutableStateOf("") }
         var startH by remember { mutableStateOf("09") }
         var endH by remember { mutableStateOf("18") }
-
-        // Estado dos dias da semana (Domingo a Sábado)
-        // Inicia com Seg-Sex true, Dom/Sáb false
         val days = remember { mutableStateListOf(false, true, true, true, true, true, false) }
-        val dayNames = listOf("D", "S", "T", "Q", "Q", "S", "S") // Iniciais em PT
+        val dayNames = listOf("D", "S", "T", "Q", "Q", "S", "S")
 
         AlertDialog(
             onDismissRequest = { showTimeWindowDialog = false },
@@ -424,7 +421,6 @@ fun ProtectedDashboard(
                     Text(stringResource(R.string.monitoring_windows_desc), fontSize = 12.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Lista de Janelas Existentes
                     LazyColumn(modifier = Modifier.heightIn(max = 150.dp)) {
                         items(protegidoViewModel.timeWindows) { window ->
                             Row(
@@ -445,8 +441,6 @@ fun ProtectedDashboard(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    // Formulário para Nova Janela
                     Text(stringResource(R.string.add_new_schedule), fontWeight = FontWeight.Bold)
 
                     OutlinedTextField(
@@ -478,8 +472,6 @@ fun ProtectedDashboard(
                     }
 
                     Text(stringResource(R.string.days_of_week), modifier = Modifier.padding(top=8.dp))
-
-                    // Checkboxes dos dias
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         dayNames.forEachIndexed { index, name ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -487,7 +479,7 @@ fun ProtectedDashboard(
                                 Checkbox(
                                     checked = days[index],
                                     onCheckedChange = { days[index] = it },
-                                    modifier = Modifier.size(32.dp) // Checkbox mais pequena para caber
+                                    modifier = Modifier.size(32.dp)
                                 )
                             }
                         }
@@ -499,16 +491,15 @@ fun ProtectedDashboard(
                     if (newName.isNotEmpty() && user != null) {
                         val s = startH.toIntOrNull() ?: 9
                         val e = endH.toIntOrNull() ?: 18
-
                         val newWindow = pt.isec.amov.safetysec.data.model.TimeWindow(
-                            id = "", // O ID é gerado no Firebase
+                            id = "",
                             name = newName,
                             startHour = s,
                             endHour = e,
                             activeDays = days.toList()
                         )
                         protegidoViewModel.addTimeWindow(user.id, newWindow)
-                        newName = "" // Limpar campo
+                        newName = ""
                     }
                 }) { Text(stringResource(R.string.btn_add)) }
             },

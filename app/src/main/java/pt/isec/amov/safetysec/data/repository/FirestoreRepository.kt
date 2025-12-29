@@ -14,10 +14,6 @@ class FirestoreRepository {
 
     // --- ASSOCIAÇÃO (Mecanismo OTP) ---
 
-    /**
-     * Gera e guarda um código de associação no perfil do Protegido [cite: 18]
-     */
-
     // Ponto 2 e 4: Gravar o código gerado
     suspend fun updateConnectionCode(userId: String, code: String): Result<Unit> {
         return try {
@@ -50,7 +46,6 @@ class FirestoreRepository {
             val monitorRef = db.collection("users").document(monitorId)
             val protectedRef = db.collection("users").document(protectedId)
 
-            // Corrigido para os nomes do teu modelo:
             batch.update(monitorRef, "associatedProtegidoIds", FieldValue.arrayUnion(protectedId))
             batch.update(protectedRef, "associatedMonitorIds", FieldValue.arrayUnion(monitorId))
 
@@ -64,7 +59,7 @@ class FirestoreRepository {
         }
     }
 
-    // função para listar os protegidos com os nomes correctos
+    // Função para listar os protegidos com os nomes correctos
     suspend fun getAssociatedUsers(uids: List<String>): Result<List<User>> {
         return try {
             if (uids.isEmpty()) return Result.success(emptyList())
@@ -84,11 +79,9 @@ class FirestoreRepository {
     // Função para criar o Alerta na Base de Dados
     suspend fun createAlert(alert: Alert): Result<String> {
         return try {
-            // Cria um ID automático para o alerta se não tiver
             val docRef = db.collection("alerts").document()
             val alertWithId = alert.copy(id = docRef.id)
 
-            // gravamos o objeto mas com o ID gerado pelo Firestore
             db.collection("alerts").document(docRef.id)
                 .set(alertWithId)
                 .await()
@@ -99,7 +92,10 @@ class FirestoreRepository {
         }
     }
 
-    suspend fun cancelAlert (alertId: String) : Result<Unit>{
+    // --- CANCELAMENTO DE ALERTAS ---
+
+    // Cancelar um alerta específico (Mantém-se por compatibilidade)
+    suspend fun cancelAlert(alertId: String): Result<Unit> {
         return try {
             db.collection("alerts").document(alertId)
                 .update(
@@ -109,7 +105,37 @@ class FirestoreRepository {
                     )
                 ).await()
             Result.success(Unit)
-        } catch (e: Exception){
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // NOVA FUNÇÃO: Cancela TODOS os alertas ativos para este utilizador (Corrige o bug de sobreposição)
+    suspend fun cancelAllActiveAlerts(protectedId: String): Result<Unit> {
+        return try {
+            // 1. Procurar todos os alertas deste user que AINDA não estão resolvidos
+            val snapshot = db.collection("alerts")
+                .whereEqualTo("protectedId", protectedId)
+                .whereEqualTo("solved", false)
+                .get()
+                .await()
+
+            if (snapshot.isEmpty) return Result.success(Unit)
+
+            // 2. Criar um lote (batch) para fechar todos ao mesmo tempo
+            val batch = db.batch()
+
+            for (document in snapshot.documents) {
+                batch.update(document.reference, mapOf(
+                    "cancelled" to true,
+                    "solved" to true
+                ))
+            }
+
+            // 3. Executar
+            batch.commit().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -118,11 +144,10 @@ class FirestoreRepository {
         if (protectedIds.isEmpty()) return
 
         db.collection("alerts")
-            .whereIn("protectedId", protectedIds) // Filtra pelos ecrãs que o monitor vigia
-            .whereEqualTo("solved", false)      // Apenas alertas ativos
+            .whereIn("protectedId", protectedIds)
+            .whereEqualTo("solved", false)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
-
                 val alerts = snapshot?.toObjects(Alert::class.java) ?: emptyList()
                 onAlertsReceived(alerts)
             }
@@ -142,17 +167,17 @@ class FirestoreRepository {
         }
     }
 
-    suspend fun updateUserProfile (userId : String, updates: Map<String, Any>): Result<Unit>{
+    suspend fun updateUserProfile(userId: String, updates: Map<String, Any>): Result<Unit> {
         return try {
             db.collection("users").document(userId).update(updates).await()
             Result.success(Unit)
-        }catch (e : Exception){
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
 
-    // 1. Monitor propõe a regra [cite: 22]
+    // 1. Monitor propõe a regra
     suspend fun proposeRule(rule: Rule): Result<Unit> {
         return try {
             val docRef = db.collection("rules").document()
@@ -162,7 +187,7 @@ class FirestoreRepository {
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    // 2. Protegido ou Monitor listam as regras [cite: 47, 58]
+    // 2. Protegido ou Monitor listam as regras
     fun listenToRules(protectedId: String, onUpdate: (List<Rule>) -> Unit) {
         db.collection("rules")
             .whereEqualTo("protectedId", protectedId)
@@ -187,7 +212,7 @@ class FirestoreRepository {
         return try {
             val snapshot = db.collection("rules")
                 .whereEqualTo("protectedId", protectedId)
-                .whereEqualTo("monitorId", monitorId) // <--- O FILTRO MÁGICO
+                .whereEqualTo("monitorId", monitorId)
                 .get()
                 .await()
 
@@ -198,16 +223,14 @@ class FirestoreRepository {
         }
     }
 
-    suspend fun removeAssociation (monitorId: String, protectedId: String) : Result<Unit>{
+    suspend fun removeAssociation(monitorId: String, protectedId: String): Result<Unit> {
         return try {
-
             val rulesSnapshot = db.collection("rules")
                 .whereEqualTo("monitorId", monitorId)
                 .whereEqualTo("protectedId", protectedId)
                 .get()
                 .await()
 
-            //usamos batch (lote) para garantir que o id do monitor e do protegido são apagados ao msm tempo
             val batch = db.batch()
 
             for (ruleDoc in rulesSnapshot.documents) {
@@ -217,20 +240,17 @@ class FirestoreRepository {
             val monitorRef = db.collection("users").document(monitorId)
             val protectedRef = db.collection("users").document(protectedId)
 
-            //remover o id do protegido da lista do monitor
-            batch.update(monitorRef,"associatedProtegidoIds", FieldValue.arrayRemove(protectedId))
-
-            //remover o id do monitor da lista do protegido
-            batch.update(protectedRef,"associatedMonitorIds", FieldValue.arrayRemove(monitorId))
+            batch.update(monitorRef, "associatedProtegidoIds", FieldValue.arrayRemove(protectedId))
+            batch.update(protectedRef, "associatedMonitorIds", FieldValue.arrayRemove(monitorId))
 
             batch.commit().await()
             Result.success(Unit)
-        } catch (e : Exception){
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    suspend fun updateRule (ruleId : String, updates: Map<String, Any>): Result <Unit> {
+    suspend fun updateRule(ruleId: String, updates: Map<String, Any>): Result<Unit> {
         return try {
             db.collection("rules").document(ruleId).update(updates).await()
             Result.success(Unit)
@@ -239,7 +259,7 @@ class FirestoreRepository {
         }
     }
 
-    suspend fun deleteRule (ruleId : String): Result <Unit> {
+    suspend fun deleteRule(ruleId: String): Result<Unit> {
         return try {
             db.collection("rules").document(ruleId).delete().await()
             Result.success(Unit)
@@ -256,9 +276,7 @@ class FirestoreRepository {
                 .get()
                 .await()
 
-            // Convertemos para objetos e ordenamos por data (do mais recente para o mais antigo)
             val alerts = snapshot.toObjects(Alert::class.java).sortedByDescending { it.date }
-
             Result.success(alerts)
         } catch (e: Exception) {
             Result.failure(e)
@@ -267,20 +285,15 @@ class FirestoreRepository {
 
     // Obter histórico global de VÁRIOS protegidos (para o Monitor)
     suspend fun getAlertsForMonitor(protectedIds: List<String>): Result<List<Alert>> {
-        // Se o monitor não tiver ninguém, não vale a pena ir à base de dados
         if (protectedIds.isEmpty()) return Result.success(emptyList())
 
         return try {
-            // NOTA: O Firestore tem um limite de 10 itens no "whereIn".
-            // Para este projeto escolar serve, mas numa app real terias de dividir a lista.
             val snapshot = db.collection("alerts")
-                .whereIn("protectedId", protectedIds) // Traz-me alertas onde o ID seja UM DESTES
+                .whereIn("protectedId", protectedIds)
                 .get()
                 .await()
 
-            // Convertemos e ordenamos por data (mais recente primeiro)
             val alerts = snapshot.toObjects(Alert::class.java).sortedByDescending { it.date }
-
             Result.success(alerts)
         } catch (e: Exception) {
             Result.failure(e)

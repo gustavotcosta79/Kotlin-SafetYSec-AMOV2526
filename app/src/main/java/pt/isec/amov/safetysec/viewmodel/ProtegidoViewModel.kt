@@ -1,19 +1,19 @@
 package pt.isec.amov.safetysec.viewmodel
 
-import android.app.Application // Importante
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel // Importante
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import pt.isec.amov.safetysec.R // Importante
+import pt.isec.amov.safetysec.R
 import pt.isec.amov.safetysec.data.model.Alert
 import pt.isec.amov.safetysec.data.model.Rule
 import pt.isec.amov.safetysec.data.model.RuleType
@@ -24,7 +24,6 @@ import pt.isec.amov.safetysec.managers.LocationManager
 import pt.isec.amov.safetysec.managers.SensorManager
 import java.util.Date
 
-// Mudança para AndroidViewModel
 class ProtegidoViewModel(
     application: Application,
     private val locationManager: LocationManager,
@@ -265,7 +264,8 @@ class ProtegidoViewModel(
     // CANCELAMENTO E VIDEO
     // =========================================================================
 
-    fun handleCancelRequest(inputPin: String, correctPin: String) {
+    // MUDANÇA: Agora recebe userId para cancelar TODOS os alertas ativos
+    fun handleCancelRequest(inputPin: String, correctPin: String, userId: String) {
         if (inputPin != correctPin) {
             errorMessage = getString(R.string.pin_incorrect)
             return
@@ -277,18 +277,20 @@ class ProtegidoViewModel(
             countdownValue = 10
             successMessage = getString(R.string.alert_cancelled_time)
             errorMessage = null
+            activeAlertId = null
             return
         }
 
-        if (activeAlertId != null) {
-            cancelPanicAlert(activeAlertId!!)
-        }
+        // Se já está na base de dados, cancelamos TODOS do utilizador
+        cancelAllAlertsForUser(userId)
     }
 
-    private fun cancelPanicAlert(alertId: String) {
+    private fun cancelAllAlertsForUser(userId: String) {
         isLoading = true
         viewModelScope.launch {
-            val result = firestoreRepository.cancelAlert(alertId)
+            // Chama a nova função do repositório
+            val result = firestoreRepository.cancelAllActiveAlerts(userId)
+
             isLoading = false
             if (result.isSuccess) {
                 activeAlertId = null
