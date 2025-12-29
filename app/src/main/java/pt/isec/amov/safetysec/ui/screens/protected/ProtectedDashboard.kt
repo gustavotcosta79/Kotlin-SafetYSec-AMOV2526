@@ -107,10 +107,12 @@ fun ProtectedDashboard(
         if (user != null) {
             protegidoViewModel.startObservingRules(user.id)
             // Se tiveres implementado as janelas temporais:
-            // protegidoViewModel.startTimeWindowObservation(user.id)
+            protegidoViewModel.startTimeWindowObservation(user.id)
             authViewModel.fetchAssociatedMonitors()
             protegidoViewModel.startAutomaticMonitoring(user)
             protegidoViewModel.startSensorMonitoring(user)
+
+
         }
     }
 
@@ -272,7 +274,6 @@ fun ProtectedDashboard(
                     }
                 )
             }
-
         }
 
         // =========================================================
@@ -405,9 +406,116 @@ fun ProtectedDashboard(
 
     // --- JANELAS TEMPORAIS (Dialog) ---
     if (showTimeWindowDialog) {
-        // ... (Insere aqui o teu código do diálogo de janelas temporais se o tiveres) ...
-        // Como no teu exemplo original já tinhas a lógica, podes mantê-la aqui.
-        // Se precisares, posso reenviar, mas a estrutura é igual aos outros diálogos.
+        // Estados locais do formulário
+        var newName by remember { mutableStateOf("") }
+        var startH by remember { mutableStateOf("09") }
+        var endH by remember { mutableStateOf("18") }
+
+        // Estado dos dias da semana (Domingo a Sábado)
+        // Inicia com Seg-Sex true, Dom/Sáb false
+        val days = remember { mutableStateListOf(false, true, true, true, true, true, false) }
+        val dayNames = listOf("D", "S", "T", "Q", "Q", "S", "S") // Iniciais em PT
+
+        AlertDialog(
+            onDismissRequest = { showTimeWindowDialog = false },
+            title = { Text(stringResource(R.string.monitoring_windows_title)) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.monitoring_windows_desc), fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Lista de Janelas Existentes
+                    LazyColumn(modifier = Modifier.heightIn(max = 150.dp)) {
+                        items(protegidoViewModel.timeWindows) { window ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(window.name, fontWeight = FontWeight.Bold)
+                                    Text("${window.startHour}:00 - ${window.endHour}:00", fontSize = 12.sp)
+                                }
+                                IconButton(onClick = { if (user != null) protegidoViewModel.deleteTimeWindow(user.id, window.id) }) {
+                                    Icon(Icons.Default.Delete, stringResource(R.string.btn_delete), tint = Color.Red)
+                                }
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Formulário para Nova Janela
+                    Text(stringResource(R.string.add_new_schedule), fontWeight = FontWeight.Bold)
+
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text(stringResource(R.string.schedule_name_hint)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        OutlinedTextField(
+                            value = startH,
+                            onValueChange = { startH = it },
+                            label = { Text(stringResource(R.string.start_h)) },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = endH,
+                            onValueChange = { endH = it },
+                            label = { Text(stringResource(R.string.end_h)) },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                    }
+
+                    Text(stringResource(R.string.days_of_week), modifier = Modifier.padding(top=8.dp))
+
+                    // Checkboxes dos dias
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        dayNames.forEachIndexed { index, name ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(name, fontSize = 10.sp)
+                                Checkbox(
+                                    checked = days[index],
+                                    onCheckedChange = { days[index] = it },
+                                    modifier = Modifier.size(32.dp) // Checkbox mais pequena para caber
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newName.isNotEmpty() && user != null) {
+                        val s = startH.toIntOrNull() ?: 9
+                        val e = endH.toIntOrNull() ?: 18
+
+                        val newWindow = pt.isec.amov.safetysec.data.model.TimeWindow(
+                            id = "", // O ID é gerado no Firebase
+                            name = newName,
+                            startHour = s,
+                            endHour = e,
+                            activeDays = days.toList()
+                        )
+                        protegidoViewModel.addTimeWindow(user.id, newWindow)
+                        newName = "" // Limpar campo
+                    }
+                }) { Text(stringResource(R.string.btn_add)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimeWindowDialog = false }) { Text(stringResource(R.string.btn_close)) }
+            }
+        )
     }
 }
 
