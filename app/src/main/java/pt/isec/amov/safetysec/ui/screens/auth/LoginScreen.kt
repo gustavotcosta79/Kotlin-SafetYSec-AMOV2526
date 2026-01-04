@@ -28,9 +28,62 @@ fun LoginScreen(
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
 
-    // --- NOVO ESTADO: Controla se o diálogo de recuperação está visível ---
+    // Controla se o diálogo de recuperação está visível
     var showRecoverDialog by remember { mutableStateOf(false) }
     var recoverEmail by remember { mutableStateOf("") }
+
+    // --- ESTADOS PARA O MFA (Simulação) ---
+    var mfaInput by remember { mutableStateOf("") }
+    var mfaError by remember { mutableStateOf(false) }
+
+    // DIÁLOGO DE MFA (Aparece quando o Login está correto)
+    if (viewModel.isMfaVisible) {
+        AlertDialog(
+            onDismissRequest = { /* Não fecha ao clicar fora */ },
+            title = { Text("Verificação de Segurança") },
+            text = {
+                Column {
+                    Text("Foi enviado um código de verificação para a consola do Android Studio (Simulação de Email).")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = mfaInput,
+                        onValueChange = {
+                            if (it.length <= 6) mfaInput = it
+                            mfaError = false
+                        },
+                        label = { Text("Código de 6 dígitos") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        isError = mfaError
+                    )
+                    if (mfaError) {
+                        Text("Código incorreto", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (viewModel.verifyMfaCode(mfaInput)) {
+                        // CÓDIGO CERTO -> ENTRA NA APP
+                        viewModel.isMfaVisible = false // Fecha dialog
+                        onLoginSuccess() // Navega
+                    } else {
+                        mfaError = true
+                    }
+                }) {
+                    Text("Verificar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.cancelMfa()
+                    mfaInput = ""
+                }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -91,7 +144,7 @@ fun LoginScreen(
             singleLine = true
         )
 
-        // --- NOVO: Link "Esqueci-me da password" ---
+        // Link "Esqueci-me da password"
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             Text(
                 text = stringResource(R.string.forgot_password_link),
@@ -105,7 +158,6 @@ fun LoginScreen(
                     .padding(vertical = 8.dp)
             )
         }
-        // -------------------------------------------
 
         // Mensagem de Erro
         if (viewModel.errorMessage != null) {
@@ -123,7 +175,13 @@ fun LoginScreen(
             CircularProgressIndicator()
         } else {
             Button(
-                onClick = { viewModel.onLoginClick(onLoginSuccess) },
+                onClick = {
+                    // MUDANÇA: Em vez de ir direto, chama o MFA
+                    viewModel.onLoginClick {
+                        // Login Firebase OK -> Inicia o MFA
+                        viewModel.startMfaProcess()
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
                 Text(stringResource(R.string.login_button))
@@ -138,7 +196,7 @@ fun LoginScreen(
         }
     }
 
-    // --- NOVO: DIÁLOGO DE RECUPERAÇÃO ---
+    // DIÁLOGO DE RECUPERAÇÃO DE PASSWORD
     if (showRecoverDialog) {
         AlertDialog(
             onDismissRequest = { showRecoverDialog = false },

@@ -65,10 +65,46 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     var associatedMonitors by mutableStateOf<List<User>>(emptyList())
         private set
 
+    // --- SIMULAÇÃO DE MFA (Autenticação de 2 Fatores) ---
+    var generatedMfaCode by mutableStateOf("")
+    var isMfaVisible by mutableStateOf(false)
+
     init {
         if (auth.currentUser != null) {
             fetchCurrentUser()
         }
+    }
+
+    fun startMfaProcess() {
+        // 1. Gera um número aleatório de 6 dígitos
+        val code = (100000..999999).random().toString()
+        generatedMfaCode = code
+        isMfaVisible = true
+
+        // 2. Imprime na Consola (Logcat) para simular o envio de email
+        println("==============================================")
+        println("       SIMULACAO DE ENVIO DE EMAIL MFA        ")
+        println("==============================================")
+        println("PARA: $email")
+        println("ASSUNTO: O seu codigo de verificacao")
+        println("CODIGO: $code")
+        println("==============================================")
+    }
+
+    fun verifyMfaCode(input: String): Boolean {
+        return input == generatedMfaCode
+    }
+
+    fun cancelMfa() {
+        generatedMfaCode = ""
+        isMfaVisible = false
+        signOut() // Se cancela o MFA, fazemos logout por segurança
+    }
+
+    fun signOut() {
+        auth.signOut()
+        currentUser = null
+        connectionCode = null
     }
 
     fun initializeEditState() {
